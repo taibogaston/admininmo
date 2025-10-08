@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PROPIETARIO
+  INQUILINO
+}
+
+enum ContratoEstado {
+  ACTIVO
+  INACTIVO
+}
+
+enum PagoEstado {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+enum PagoMetodo {
+  MP
+  TRANSFERENCIA
+}
+
+enum MovimientoTipo {
+  CARGO
+  PAGO
+}
+
+enum TransferenciaEstado {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+enum DescuentoEstado {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  nombre       String
+  apellido     String
+  telefono     String?
+  dni          String?
+  cuitCuil     String?
+  rol          UserRole
+  cbu          String?
+  banco        String?
+  createdAt    DateTime      @default(now())
+  contratosPropietario Contrato[] @relation("PropietarioContratos")
+  contratosInquilino   Contrato[] @relation("InquilinoContratos")
+  transferenciasVerificadas Transferencia[] @relation("VerificadorTransferencias")
+  descuentosSolicitados Descuento[] @relation("InquilinoDescuentos")
+}
+
+model Contrato {
+  id             String            @id @default(cuid())
+  propietario    User              @relation("PropietarioContratos", fields: [propietarioId], references: [id])
+  propietarioId  String
+  inquilino      User              @relation("InquilinoContratos", fields: [inquilinoId], references: [id])
+  inquilinoId    String
+  direccion      String
+  montoMensual   Decimal           @db.Decimal(12, 2)
+  comisionMensual Decimal          @db.Decimal(12, 2) @default(0)
+  diaVencimiento Int               @default(10)
+  fechaInicio    DateTime
+  fechaFin       DateTime
+  ajusteFrecuenciaMeses Int        @default(12)
+  estado         ContratoEstado
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  pagos          Pago[]
+  archivos       ContratoArchivo[]
+  movimientos    Movimiento[]
+  descuentos     Descuento[]
+
+  @@index([propietarioId])
+  @@index([inquilinoId])
+  @@index([estado])
+}
+
+model ContratoArchivo {
+  id         String   @id @default(cuid())
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
+  contratoId String
+  fileName   String
+  filePath   String
+  mimeType   String
+  uploadedAt DateTime @default(now())
+
+  @@index([contratoId])
+}
+
+model Pago {
+  id            String         @id @default(cuid())
+  contrato      Contrato       @relation(fields: [contratoId], references: [id])
+  contratoId    String
+  mes           String
+  monto         Decimal        @db.Decimal(12, 2)
+  comision      Decimal        @db.Decimal(12, 2) @default(0)
+  estado        PagoEstado     @default(PENDIENTE)
+  fechaPago     DateTime?
+  metodoPago    PagoMetodo?
+  mpPreferenceId String?
+  mpPaymentId    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  movimiento    Movimiento?
+  transferencia Transferencia?
+
+  @@unique([contratoId, mes])
+  @@index([contratoId])
+  @@index([estado])
+}
+
+model Movimiento {
+  id          String        @id @default(cuid())
+  contrato    Contrato      @relation(fields: [contratoId], references: [id])
+  contratoId  String
+  tipo        MovimientoTipo
+  concepto    String
+  monto       Decimal        @db.Decimal(12, 2)
+  fecha       DateTime       @default(now())
+  pago        Pago?          @relation(fields: [pagoId], references: [id])
+  pagoId      String?       @unique
+
+  @@index([contratoId])
+  @@index([fecha])
+}
+
+model Transferencia {
+  id               String              @id @default(cuid())
+  pago             Pago                @relation(fields: [pagoId], references: [id])
+  pagoId           String              @unique
+  comprobantePath  String
+  verificado       TransferenciaEstado @default(PENDIENTE)
+  verificadoPor    User?               @relation("VerificadorTransferencias", fields: [verificadoPorId], references: [id])
+  verificadoPorId  String?
+  verificadoAt     DateTime?
+  comentario       String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([verificado])
+}
+
+model Descuento {
+  id          String           @id @default(cuid())
+  contrato    Contrato         @relation(fields: [contratoId], references: [id])
+  contratoId  String
+  inquilino   User             @relation("InquilinoDescuentos", fields: [inquilinoId], references: [id])
+  inquilinoId String
+  monto       Decimal          @db.Decimal(12, 2)
+  motivo      String
+  estado      DescuentoEstado  @default(PENDIENTE)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([contratoId])
+  @@index([estado])
+}

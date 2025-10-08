@@ -1,0 +1,15 @@
+{
+  "name": "admin-inmo",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "workspaces": {
+    "packages": ["apps/*"]
+  },
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c blue,green \"npm run dev --workspace=@admin-inmo/api\" \"npm run dev --workspace=@admin-inmo/web\"",
+    "postinstall": "npm run prisma:generate --workspace=@admin-inmo/api"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

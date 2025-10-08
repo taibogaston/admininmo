@@ -1,0 +1,10 @@
+﻿/node_modules
+/apps/*/node_modules
+/apps/api/dist
+/apps/api/uploads
+.env
+/apps/api/.env
+/apps/web/.env.local
+/apps/web/.next
+/apps/web/out
+.DS_Store
