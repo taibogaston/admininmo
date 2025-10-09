@@ -34,10 +34,15 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
+      const data = (await res.json().catch(() => null)) as { message?: string; user?: { mustChangePassword?: boolean } } | null;
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
         const message = data?.message ?? "Error al iniciar sesion";
         toast.error(message);
+        return;
+      }
+      if (data?.user?.mustChangePassword) {
+        toast.success("Sesion iniciada. Debes actualizar la contrasena.");
+        router.replace("/change-password");
         return;
       }
       toast.success("Sesion iniciada");
@@ -76,3 +81,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

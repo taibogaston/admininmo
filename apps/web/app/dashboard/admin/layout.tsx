@@ -1,4 +1,4 @@
-﻿import { ReactNode } from "react";
+import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/server-api";
 import { User } from "@/lib/types";

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Contrato" ADD COLUMN     "fechaUltimoAjuste" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

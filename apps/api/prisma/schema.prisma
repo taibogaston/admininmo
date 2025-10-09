@@ -59,6 +59,7 @@ model User {
   rol          UserRole
   cbu          String?
   banco        String?
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime      @default(now())
   inmobiliaria   Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
   inmobiliariaId String?
@@ -84,6 +85,7 @@ model Contrato {
   diaVencimiento Int               @default(10)
   fechaInicio    DateTime
   fechaFin       DateTime
+  fechaUltimoAjuste DateTime @default(now())
   ajusteFrecuenciaMeses Int        @default(12)
   estado         ContratoEstado
   createdAt      DateTime          @default(now())

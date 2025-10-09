@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, UserPlus, FileText, Percent, ArrowLeftRight } from "lucide-react";
+import { LayoutDashboard, Users, ClipboardList, FileText, Percent, ArrowLeftRight } from "lucide-react";
 
-export type AdminSection = "overview" | "assign" | "contracts" | "discounts" | "transfers";
+export type AdminSection = "overview" | "users" | "assign" | "contracts" | "discounts" | "transfers";
 
 export interface AdminSectionConfig {
   id: AdminSection;
@@ -11,7 +11,8 @@ export interface AdminSectionConfig {
 
 export const ADMIN_SECTIONS: readonly AdminSectionConfig[] = [
   { id: "overview", label: "Resumen", icon: LayoutDashboard },
-  { id: "assign", label: "Asignar contrato", icon: UserPlus },
+  { id: "users", label: "Usuarios", icon: Users },
+  { id: "assign", label: "Asignar contrato", icon: ClipboardList },
   { id: "contracts", label: "Contratos", icon: FileText },
   { id: "discounts", label: "Descuentos", icon: Percent },
   { id: "transfers", label: "Transferencias", icon: ArrowLeftRight },

@@ -15,6 +15,7 @@ const contractInputSchema = z.object({
   diaVencimiento: z.number().int().min(1).max(31).default(10),
   fechaInicio: z.coerce.date(),
   fechaFin: z.coerce.date(),
+  fechaUltimoAjuste: z.coerce.date(),
   ajusteFrecuenciaMeses: z.number().int().min(1).max(60).default(12),
   estado: z.enum(["ACTIVO", "INACTIVO"]),
 });
@@ -116,6 +117,14 @@ export const createContract = async (data: unknown, actor: AuthTokenPayload) => 
     throw new HttpError(400, "La fecha de fin debe ser posterior a la fecha de inicio");
   }
 
+  if (parsed.fechaUltimoAjuste < parsed.fechaInicio) {
+    throw new HttpError(400, "La fecha del ultimo ajuste no puede ser anterior al inicio del contrato");
+  }
+
+  if (parsed.fechaUltimoAjuste > parsed.fechaFin) {
+    throw new HttpError(400, "La fecha del ultimo ajuste debe estar dentro del rango del contrato");
+  }
+
   return prisma.contrato.create({
     data: {
       inmobiliariaId: tenantId,
@@ -127,6 +136,7 @@ export const createContract = async (data: unknown, actor: AuthTokenPayload) => 
       diaVencimiento: parsed.diaVencimiento,
       fechaInicio: parsed.fechaInicio,
       fechaFin: parsed.fechaFin,
+      fechaUltimoAjuste: parsed.fechaUltimoAjuste,
       ajusteFrecuenciaMeses: parsed.ajusteFrecuenciaMeses,
       estado: parsed.estado as any,
     },
@@ -147,6 +157,17 @@ export const updateContract = async (contratoId: string, data: unknown, actor: A
 
   if (parsed.fechaInicio && parsed.fechaFin && parsed.fechaFin <= parsed.fechaInicio) {
     throw new HttpError(400, "La fecha de fin debe ser posterior a la fecha de inicio");
+  }
+
+  if (parsed.fechaUltimoAjuste) {
+    const startDate = parsed.fechaInicio ?? existing.fechaInicio;
+    const endDate = parsed.fechaFin ?? existing.fechaFin;
+    if (parsed.fechaUltimoAjuste < startDate) {
+      throw new HttpError(400, "La fecha del ultimo ajuste no puede ser anterior al inicio del contrato");
+    }
+    if (parsed.fechaUltimoAjuste > endDate) {
+      throw new HttpError(400, "La fecha del ultimo ajuste debe estar dentro del rango del contrato");
+    }
   }
 
   const dataToUpdate: Prisma.ContratoUpdateInput = {};
@@ -181,6 +202,7 @@ export const updateContract = async (contratoId: string, data: unknown, actor: A
   if (parsed.diaVencimiento !== undefined) dataToUpdate.diaVencimiento = parsed.diaVencimiento;
   if (parsed.fechaInicio !== undefined) dataToUpdate.fechaInicio = parsed.fechaInicio;
   if (parsed.fechaFin !== undefined) dataToUpdate.fechaFin = parsed.fechaFin;
+  if (parsed.fechaUltimoAjuste !== undefined) dataToUpdate.fechaUltimoAjuste = parsed.fechaUltimoAjuste;
   if (parsed.ajusteFrecuenciaMeses !== undefined) {
     dataToUpdate.ajusteFrecuenciaMeses = parsed.ajusteFrecuenciaMeses;
   }

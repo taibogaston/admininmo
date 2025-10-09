@@ -14,6 +14,10 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  if (user.mustChangePassword) {
+    redirect("/change-password");
+  }
+
   if (user.rol === UserRole.SUPER_ADMIN) {
     redirect("/dashboard/super-admin");
   }

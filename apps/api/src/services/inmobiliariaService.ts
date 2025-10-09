@@ -43,7 +43,7 @@ export const createInmobiliaria = async (data: unknown, actor: AuthTokenPayload)
     },
   });
 
-  const adminUser = await registerUser(
+  const { user: adminUser } = await registerUser(
     {
       ...parsed.admin,
       rol: UserRole.ADMIN,

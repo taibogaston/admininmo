@@ -1,5 +1,7 @@
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { UserRole, AuthTokenPayload } from "@admin-inmo/shared";
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../utils/prisma";
 import { hashPassword, comparePassword } from "../auth/password";
 import { HttpError } from "../utils/errors";
@@ -8,7 +10,7 @@ const prisma = getPrisma();
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).optional(),
   nombre: z.string().min(1),
   apellido: z.string().min(1),
   telefono: z.string().optional(),
@@ -21,11 +23,12 @@ const registerSchema = z.object({
 });
 
 type RegisterInput = z.infer<typeof registerSchema>;
+type PrismaUserWithRelations = Prisma.UserGetPayload<{ include: { inmobiliaria: true } }>; 
 
 export const registerUser = async (
   data: unknown,
   options: { allowSelfSignup: boolean; creator?: AuthTokenPayload }
-) => {
+): Promise<{ user: PrismaUserWithRelations; temporaryPassword?: string }> => {
   const parsed: RegisterInput = registerSchema.parse(data);
 
   const creator = options.creator;
@@ -35,7 +38,7 @@ export const registerUser = async (
   }
 
   if (!options.allowSelfSignup && !creator) {
-    throw new HttpError(403, "Autenticación requerida para crear usuarios");
+    throw new HttpError(403, "Autenticacion requerida para crear usuarios");
   }
 
   if (options.allowSelfSignup && !creator && parsed.rol !== UserRole.INQUILINO) {
@@ -43,15 +46,16 @@ export const registerUser = async (
   }
 
   if (creator && creator.role !== UserRole.SUPER_ADMIN && creator.role !== UserRole.ADMIN) {
-    throw new HttpError(403, "No tenés permisos para crear usuarios");
+    throw new HttpError(403, "No tenes permisos para crear usuarios");
   }
 
   const exists = await prisma.user.findUnique({ where: { email: parsed.email } });
   if (exists) {
-    throw new HttpError(409, "El email ya está registrado");
+    throw new HttpError(409, "El email ya esta registrado");
   }
 
   let targetInmobiliariaId: string | null = parsed.inmobiliariaId ?? null;
+  let temporaryPassword: string | undefined;
 
   if (parsed.rol === UserRole.SUPER_ADMIN) {
     targetInmobiliariaId = null;
@@ -68,9 +72,27 @@ export const registerUser = async (
     if (!targetInmobiliariaId) {
       throw new HttpError(400, "No se pudo determinar la inmobiliaria del usuario");
     }
+    if (creator?.role === UserRole.ADMIN) {
+      if (parsed.rol !== UserRole.INQUILINO && parsed.rol !== UserRole.PROPIETARIO) {
+        throw new HttpError(403, "Solo podes crear inquilinos o propietarios");
+      }
+      if (!parsed.dni || parsed.dni.trim().length === 0) {
+        throw new HttpError(400, "El DNI es obligatorio para crear usuarios");
+      }
+      targetInmobiliariaId = creator.inmobiliariaId;
+    }
   }
 
-  const passwordHash = await hashPassword(parsed.password);
+  let passwordToHash = parsed.password;
+  if (!passwordToHash) {
+    if (!creator) {
+      throw new HttpError(400, "La contrasena es obligatoria");
+    }
+    temporaryPassword = randomBytes(4).toString("hex");
+    passwordToHash = temporaryPassword;
+  }
+
+  const passwordHash = await hashPassword(passwordToHash);
 
   const user = await prisma.user.create({
     data: {
@@ -84,14 +106,48 @@ export const registerUser = async (
       rol: parsed.rol,
       cbu: parsed.cbu,
       banco: parsed.banco,
+      mustChangePassword: Boolean(temporaryPassword),
       inmobiliariaId: targetInmobiliariaId ?? undefined,
     },
     include: { inmobiliaria: true },
   });
 
-  return user;
+  return { user, temporaryPassword };
 };
 
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(8),
+  newPassword: z.string().min(8),
+});
+
+export const changePassword = async (userId: string, data: unknown) => {
+  const parsed = changePasswordSchema.parse(data);
+
+  if (parsed.currentPassword === parsed.newPassword) {
+    throw new HttpError(400, "La nueva contrasena debe ser distinta a la actual");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new HttpError(404, "Usuario no encontrado");
+  }
+
+  const matches = await comparePassword(parsed.currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new HttpError(401, "La contrasena actual no es correcta");
+  }
+
+  const passwordHash = await hashPassword(parsed.newPassword);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: false,
+    },
+  });
+};
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -103,12 +159,12 @@ export const authenticateUser = async (data: unknown) => {
   const parsed: LoginInput = loginSchema.parse(data);
   const user = await prisma.user.findUnique({ where: { email: parsed.email }, include: { inmobiliaria: true } });
   if (!user) {
-    throw new HttpError(401, "Credenciales inválidas");
+    throw new HttpError(401, "Credenciales invalidas");
   }
 
   const valid = await comparePassword(parsed.password, user.passwordHash);
   if (!valid) {
-    throw new HttpError(401, "Credenciales inválidas");
+    throw new HttpError(401, "Credenciales invalidas");
   }
 
   const tokenPayload: AuthTokenPayload = {
@@ -128,3 +184,6 @@ export const getUserById = async (id: string) => {
   }
   return user;
 };
+
+
+

@@ -22,6 +22,7 @@ export const listUsers = async (roles: UserRole[] | undefined, actor: AuthTokenP
         apellido: true,
         email: true,
         rol: true,
+        dni: true,
         inmobiliariaId: true,
       },
     });
@@ -43,7 +44,9 @@ export const listUsers = async (roles: UserRole[] | undefined, actor: AuthTokenP
       apellido: true,
       email: true,
       rol: true,
+      dni: true,
       inmobiliariaId: true,
     },
   });
 };
+

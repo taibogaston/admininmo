@@ -15,6 +15,8 @@ export interface User {
   nombre: string;
   apellido: string;
   rol: UserRole;
+  dni?: string | null;
+  mustChangePassword?: boolean;
   inmobiliariaId: string | null;
   inmobiliaria?: InmobiliariaSummary | null;
 }
@@ -67,6 +69,7 @@ export interface Contrato {
   diaVencimiento: number;
   fechaInicio: string;
   fechaFin: string;
+  fechaUltimoAjuste: string;
   ajusteFrecuenciaMeses: number;
   estado: ContratoEstado;
   propietarioId: string;
@@ -105,5 +108,6 @@ export interface InmobiliariaWithCounts extends InmobiliariaSummary {
   usuarios: number;
   contratos: number;
 }
+
 
 

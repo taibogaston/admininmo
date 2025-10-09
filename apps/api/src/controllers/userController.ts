@@ -1,4 +1,4 @@
-﻿import { Request, Response } from "express";
+import { Request, Response } from "express";
 import { registerUser } from "../services/authService";
 import { env } from "../env";
 import { HttpError } from "../utils/errors";
@@ -11,14 +11,22 @@ interface AuthenticatedRequest extends Request {
 
 export const createUserController = async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) throw new HttpError(401, "No autenticado");
-  const user = await registerUser(req.body, { allowSelfSignup: env.ALLOW_SELF_SIGNUP, creator: req.user });
+  const { user, temporaryPassword } = await registerUser(req.body, {
+    allowSelfSignup: env.ALLOW_SELF_SIGNUP,
+    creator: req.user,
+  });
+
   res.status(201).json({
-    id: user.id,
-    email: user.email,
-    rol: user.rol,
-    nombre: user.nombre,
-    apellido: user.apellido,
-    inmobiliariaId: user.inmobiliariaId ?? null,
+    user: {
+      id: user.id,
+      email: user.email,
+      rol: user.rol,
+      nombre: user.nombre,
+      apellido: user.apellido,
+      dni: user.dni ?? null,
+      inmobiliariaId: user.inmobiliariaId ?? null,
+    },
+    temporaryPassword: temporaryPassword ?? null,
   });
 };
 
@@ -34,3 +42,4 @@ export const listUsersController = async (req: AuthenticatedRequest, res: Respon
   const users = await listUsers(parsedRoles, req.user, inmobiliariaId);
   res.json(users);
 };
+

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Copy } from "lucide-react";
 import { Contrato, DescuentoDetalle, Transferencia, User } from "@/lib/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,9 @@ import { clientApiFetch } from "@/lib/client-api";
 import { ADMIN_SECTIONS, AdminSection } from "./admin/sections";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { UserRole } from "@admin-inmo/shared";
 
-type UserOption = Pick<User, "id" | "nombre" | "apellido" | "email" | "rol">;
+type UserOption = Pick<User, "id" | "nombre" | "apellido" | "email" | "rol" | "dni">;
 
 interface AdminDashboardProps {
   contratos: Contrato[];
@@ -32,6 +33,7 @@ interface ContractEditorState {
   fechaInicio: string;
   fechaFin: string;
   ajusteFrecuenciaMeses: string;
+  fechaUltimoAjuste: string;
 }
 
 interface AjusteState {
@@ -63,6 +65,27 @@ const comparePeriod = (mesA: string, mesB: string) => {
   return yearA === yearB ? monthA - monthB : yearA - yearB;
 };
 
+const parseDate = (value: string | null | undefined) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const addMonthsToDate = (date: Date, months: number) => {
+  return new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
+};
+
+const sortUserOptions = (users: UserOption[]) =>
+  [...users].sort((a, b) => {
+    const nameCompare = a.nombre.localeCompare(b.nombre, "es");
+    if (nameCompare !== 0) return nameCompare;
+    const lastNameCompare = a.apellido.localeCompare(b.apellido, "es");
+    if (lastNameCompare !== 0) return lastNameCompare;
+    return a.email.localeCompare(b.email, "es");
+  });
+
+const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
+
 export const AdminDashboard = ({
   contratos,
   transferencias,
@@ -77,6 +100,15 @@ export const AdminDashboard = ({
   const [tenants, setTenants] = useState<UserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [comentariosTransferencia, setComentariosTransferencia] = useState<Record<string, string>>({});
+  const [createUserForm, setCreateUserForm] = useState({
+    dni: "",
+    email: "",
+    nombre: "",
+    apellido: "",
+    rol: UserRole.INQUILINO,
+  });
+  const [createUserSubmitting, setCreateUserSubmitting] = useState(false);
+  const [lastCreatedCredentials, setLastCreatedCredentials] = useState<{ email: string; password: string; role: UserRole } | null>(null);
 
   const [createForm, setCreateForm] = useState({
     propietarioId: "",
@@ -88,6 +120,7 @@ export const AdminDashboard = ({
     fechaInicio: "",
     fechaFin: "",
     ajusteFrecuenciaMeses: "12",
+    fechaUltimoAjuste: "",
   });
 
   const [editorForms, setEditorForms] = useState<Record<string, ContractEditorState>>(() =>
@@ -99,6 +132,7 @@ export const AdminDashboard = ({
         fechaInicio: contrato.fechaInicio?.slice(0, 10) ?? "",
         fechaFin: contrato.fechaFin?.slice(0, 10) ?? "",
         ajusteFrecuenciaMeses: String(contrato.ajusteFrecuenciaMeses ?? 12),
+        fechaUltimoAjuste: contrato.fechaUltimoAjuste?.slice(0, 10) ?? "",
       };
       return acc;
     }, {})
@@ -122,13 +156,17 @@ export const AdminDashboard = ({
     setEditorForms((prev) => {
       const next: Record<string, ContractEditorState> = {};
       contracts.forEach((contrato) => {
-        next[contrato.id] = prev[contrato.id] ?? {
-          montoMensual: contrato.montoMensual ?? "",
-          comisionMensual: contrato.comisionMensual ?? "0",
-          diaVencimiento: String(contrato.diaVencimiento ?? 10),
-          fechaInicio: contrato.fechaInicio?.slice(0, 10) ?? "",
-          fechaFin: contrato.fechaFin?.slice(0, 10) ?? "",
-          ajusteFrecuenciaMeses: String(contrato.ajusteFrecuenciaMeses ?? 12),
+        const previous = prev[contrato.id];
+        next[contrato.id] = {
+          montoMensual: previous?.montoMensual ?? contrato.montoMensual ?? "",
+          comisionMensual: previous?.comisionMensual ?? contrato.comisionMensual ?? "0",
+          diaVencimiento: previous?.diaVencimiento ?? String(contrato.diaVencimiento ?? 10),
+          fechaInicio: previous?.fechaInicio ?? contrato.fechaInicio?.slice(0, 10) ?? "",
+          fechaFin: previous?.fechaFin ?? contrato.fechaFin?.slice(0, 10) ?? "",
+          ajusteFrecuenciaMeses:
+            previous?.ajusteFrecuenciaMeses ?? String(contrato.ajusteFrecuenciaMeses ?? 12),
+          fechaUltimoAjuste:
+            previous?.fechaUltimoAjuste ?? contrato.fechaUltimoAjuste?.slice(0, 10) ?? "",
         };
       });
       return next;
@@ -157,8 +195,8 @@ export const AdminDashboard = ({
           clientApiFetch<UserOption[]>("/api/usuarios?rol=PROPIETARIO"),
           clientApiFetch<UserOption[]>("/api/usuarios?rol=INQUILINO"),
         ]);
-        setOwners(ownersRes);
-        setTenants(tenantsRes);
+        setOwners(sortUserOptions(ownersRes));
+        setTenants(sortUserOptions(tenantsRes));
       } catch (err) {
         const message = err instanceof Error ? err.message : "No se pudieron cargar los usuarios";
         toast.error(message);
@@ -254,8 +292,81 @@ export const AdminDashboard = ({
     setContracts(refreshed);
   };
 
+  const handleCopyTemporaryPassword = async () => {
+    if (!lastCreatedCredentials?.password) return;
+    try {
+      await navigator.clipboard.writeText(lastCreatedCredentials.password);
+      toast.success("Contrasena temporal copiada");
+    } catch {
+      toast.error("No pudimos copiar la contrasena temporal");
+    }
+  };
+
+  const handleClearTemporaryCredentials = () => {
+    setLastCreatedCredentials(null);
+  };
+
+  const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCreateUserSubmitting(true);
+    try {
+      const payload = {
+        dni: createUserForm.dni.trim(),
+        email: createUserForm.email.trim(),
+        nombre: createUserForm.nombre.trim(),
+        apellido: createUserForm.apellido.trim(),
+        rol: createUserForm.rol,
+      };
+
+      const response = await clientApiFetch<{ user: User; temporaryPassword: string | null }>("/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const createdUser = response.user;
+      const option: UserOption = {
+        id: createdUser.id,
+        nombre: createdUser.nombre,
+        apellido: createdUser.apellido,
+        email: createdUser.email,
+        rol: createdUser.rol,
+        dni: createdUser.dni ?? null,
+      };
+
+      if (createdUser.rol === UserRole.PROPIETARIO) {
+        setOwners((prev) => sortUserOptions([...prev, option]));
+      } else if (createdUser.rol === UserRole.INQUILINO) {
+        setTenants((prev) => sortUserOptions([...prev, option]));
+      }
+
+      setCreateUserForm({
+        dni: "",
+        email: "",
+        nombre: "",
+        apellido: "",
+        rol: UserRole.INQUILINO,
+      });
+
+      if (response.temporaryPassword) {
+        toast.success(`Usuario creado. Contraseña temporal: ${response.temporaryPassword}`);
+      } else {
+        toast.success("Usuario creado correctamente");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo crear el usuario";
+      toast.error(message);
+    } finally {
+      setCreateUserSubmitting(false);
+    }
+  };
+
   const handleCreateContract = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!createForm.fechaUltimoAjuste) {
+      toast.error("Indica la fecha del ultimo ajuste");
+      return;
+    }
     try {
       await clientApiFetch("/api/contratos", {
         method: "POST",
@@ -269,6 +380,7 @@ export const AdminDashboard = ({
           diaVencimiento: Number(createForm.diaVencimiento),
           fechaInicio: createForm.fechaInicio,
           fechaFin: createForm.fechaFin,
+          fechaUltimoAjuste: createForm.fechaUltimoAjuste,
           ajusteFrecuenciaMeses: Number(createForm.ajusteFrecuenciaMeses || 12),
           estado: "ACTIVO",
         }),
@@ -284,6 +396,7 @@ export const AdminDashboard = ({
         fechaInicio: "",
         fechaFin: "",
         ajusteFrecuenciaMeses: "12",
+        fechaUltimoAjuste: "",
       });
       await refreshContracts();
     } catch (err) {
@@ -306,6 +419,7 @@ export const AdminDashboard = ({
           diaVencimiento: Number(form.diaVencimiento || 1),
           fechaInicio: form.fechaInicio,
           fechaFin: form.fechaFin,
+          fechaUltimoAjuste: form.fechaUltimoAjuste,
           ajusteFrecuenciaMeses: Number(form.ajusteFrecuenciaMeses || 12),
         }),
       });
@@ -360,12 +474,26 @@ export const AdminDashboard = ({
       toast.error("Calcula el ajuste antes de aplicarlo");
       return;
     }
+
+    const contrato = contracts.find((item) => item.id === contratoId);
+    const ultimoAjuste = parseDate(contrato?.fechaUltimoAjuste);
+    if (ultimoAjuste) {
+      const mesesAjuste =
+        (contrato?.ajusteFrecuenciaMeses ?? Number(ajuste.meses || 0)) || 1;
+      const proximoAjuste = addMonthsToDate(ultimoAjuste, mesesAjuste);
+      if (proximoAjuste > new Date()) {
+        toast.error(`Podras aplicar el ajuste a partir del ${formatDate(proximoAjuste.toISOString())}`);
+        return;
+      }
+    }
+
     try {
       const updated = await clientApiFetch<Contrato>(`/api/contratos/${contratoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           montoMensual: ajuste.resultado,
+          fechaUltimoAjuste: new Date().toISOString(),
         }),
       });
       setContracts((prev) => prev.map((item) => (item.id === contratoId ? updated : item)));
@@ -378,6 +506,7 @@ export const AdminDashboard = ({
           fechaInicio: updated.fechaInicio?.slice(0, 10) ?? "",
           fechaFin: updated.fechaFin?.slice(0, 10) ?? "",
           ajusteFrecuenciaMeses: String(updated.ajusteFrecuenciaMeses ?? 12),
+          fechaUltimoAjuste: updated.fechaUltimoAjuste?.slice(0, 10) ?? toIsoDate(new Date()),
         },
       }));
       setAjusteForms((prev) => ({
@@ -388,8 +517,8 @@ export const AdminDashboard = ({
           meses: ajuste.meses,
           tasaMensual: ajuste.tasaMensual,
           indices: ajuste.indices,
-          resultado: ajuste.resultado,
-          detalle: ajuste.detalle,
+          resultado: undefined,
+          detalle: undefined,
         },
       }));
       toast.success("Nuevo monto aplicado al contrato");
@@ -533,6 +662,86 @@ export const AdminDashboard = ({
             </div>
           </section>
         )}
+        {activeSection === "users" && (
+          <section id="users" className="space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Usuarios de la inmobiliaria</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-300">Crealos, comparti la contrasena temporal por un canal seguro y avisa que debe actualizarla al ingresar.</p>
+            </div>
+            <Card className="rounded-3xl border-slate-200 p-8 shadow-md dark:border-slate-800 dark:bg-slate-900">
+              <form onSubmit={handleCreateUser} className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="user-dni">DNI</Label>
+                  <Input
+                    id="user-dni"
+                    value={createUserForm.dni}
+                    onChange={(event) => setCreateUserForm((prev) => ({ ...prev, dni: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="user-email">Email</Label>
+                  <Input
+                    id="user-email"
+                    type="email"
+                    value={createUserForm.email}
+                    onChange={(event) => setCreateUserForm((prev) => ({ ...prev, email: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="user-nombre">Nombre</Label>
+                  <Input
+                    id="user-nombre"
+                    value={createUserForm.nombre}
+                    onChange={(event) => setCreateUserForm((prev) => ({ ...prev, nombre: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="user-apellido">Apellido</Label>
+                  <Input
+                    id="user-apellido"
+                    value={createUserForm.apellido}
+                    onChange={(event) => setCreateUserForm((prev) => ({ ...prev, apellido: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="user-rol">Rol</Label>
+                  <Select
+                    id="user-rol"
+                    value={createUserForm.rol}
+                    onChange={(event) => setCreateUserForm((prev) => ({ ...prev, rol: event.target.value as UserRole }))}
+                  >
+                    <option value={UserRole.INQUILINO}>Inquilino</option>
+                    <option value={UserRole.PROPIETARIO}>Propietario</option>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2">
+                  <Button type="submit" disabled={createUserSubmitting}>
+                    {createUserSubmitting ? "Creando usuario..." : "Crear usuario"}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+            {lastCreatedCredentials?.password && (
+              <Card className="rounded-3xl border border-dashed border-amber-400/70 bg-amber-50 p-6 shadow-sm dark:border-amber-400/40 dark:bg-amber-500/10">
+                <CardTitle className="text-base text-amber-900 dark:text-amber-200">Credenciales temporales</CardTitle>
+                <CardDescription className="text-sm text-amber-800 dark:text-amber-300">Se muestran una sola vez. Copialas y compartilas solo por un canal seguro.</CardDescription>
+                <p className="mt-3 text-sm text-amber-900 dark:text-amber-100">{lastCreatedCredentials.email} - {lastCreatedCredentials.role.toLowerCase()}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300/70 bg-white/80 px-4 py-3 text-sm font-mono dark:border-amber-400/40 dark:bg-amber-900/20">
+                  <span className="flex-1 text-amber-900 dark:text-amber-100">{lastCreatedCredentials.password}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={handleCopyTemporaryPassword} className="inline-flex items-center gap-2">
+                    <Copy className="h-4 w-4" /> Copiar
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={handleClearTemporaryCredentials}>Ocultar</Button>
+                </div>
+                <p className="mt-3 text-xs text-amber-800 dark:text-amber-200">El sistema obliga a cambiarla en el primer ingreso.</p>
+              </Card>
+            )}
+          </section>
+        )}
         {activeSection === "assign" && (
           <section id="assign" className="space-y-6">
           <div className="space-y-2">
@@ -540,113 +749,184 @@ export const AdminDashboard = ({
             <p className="text-sm text-slate-600 dark:text-slate-300">Define monto, comision, fechas y ajustes en pocos pasos.</p>
           </div>
           <Card className="rounded-3xl border-slate-200 p-8 shadow-md dark:border-slate-800 dark:bg-slate-900">
-            <form onSubmit={handleCreateContract} className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="propietario">Propietario</Label>
-                <Select
-                  id="propietario"
-                  value={createForm.propietarioId}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, propietarioId: event.target.value }))}
-                  disabled={loadingUsers}
-                >
-                  <option value="">Selecciona propietario</option>
-                  {owners.map((owner) => (
-                    <option key={owner.id} value={owner.id}>
-                      {owner.nombre} {owner.apellido} ({owner.email})
-                    </option>
-                  ))}
-                </Select>
+            <form onSubmit={handleCreateContract} className="mt-6 space-y-6">
+              {/* Sección 1: Propietario e Inquilino */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="propietario">Propietario</Label>
+                  <Select
+                    id="propietario"
+                    value={createForm.propietarioId}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, propietarioId: event.target.value }))}
+                    disabled={loadingUsers}
+                    required
+                  >
+                    <option value="">Selecciona propietario</option>
+                    {owners.map((owner) => (
+                      <option key={owner.id} value={owner.id}>
+                        {`${owner.nombre} ${owner.apellido} (${owner.email}${owner.dni ? ` - ${owner.dni}` : ""})`}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="inquilino">Inquilino</Label>
+                  <Select
+                    id="inquilino"
+                    value={createForm.inquilinoId}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, inquilinoId: event.target.value }))}
+                    disabled={loadingUsers}
+                    required
+                  >
+                    <option value="">Selecciona inquilino</option>
+                    {tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {`${tenant.nombre} ${tenant.apellido} (${tenant.email}${tenant.dni ? ` - ${tenant.dni}` : ""})`}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
+
+              {/* Sección 2: Dirección */}
               <div className="space-y-1">
-                <Label htmlFor="inquilino">Inquilino</Label>
-                <Select
-                  id="inquilino"
-                  value={createForm.inquilinoId}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, inquilinoId: event.target.value }))}
-                  disabled={loadingUsers}
-                >
-                  <option value="">Selecciona inquilino</option>
-                  {tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.nombre} {tenant.apellido} ({tenant.email})
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="space-y-1 sm:col-span-2">
                 <Label htmlFor="direccion">Direccion</Label>
                 <Input
                   id="direccion"
                   value={createForm.direccion}
                   onChange={(event) => setCreateForm((prev) => ({ ...prev, direccion: event.target.value }))}
+                  placeholder="Ej. Av. Siempre Viva 742"
                   required
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="monto">Monto mensual</Label>
-                <Input
-                  id="monto"
-                  type="number"
-                  min={0}
-                  value={createForm.montoMensual}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, montoMensual: event.target.value }))}
-                  required
-                />
+
+              {/* Sección 3: Monto y Comisión */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="monto">Monto mensual</Label>
+                  <Input
+                    id="monto"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={createForm.montoMensual}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, montoMensual: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="comision">Comision</Label>
+                  <Input
+                    id="comision"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={createForm.comisionMensual}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, comisionMensual: event.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="comision">Comision</Label>
-                <Input
-                  id="comision"
-                  type="number"
-                  min={0}
-                  value={createForm.comisionMensual}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, comisionMensual: event.target.value }))}
-                />
+
+              {/* Sección 4: Día de vencimiento y Frecuencia de ajuste */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1">
+                  <Label htmlFor="dia">Dia de vencimiento</Label>
+                  <Input
+                    id="dia"
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={createForm.diaVencimiento}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, diaVencimiento: event.target.value }))}
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">1 al 31, según el contrato.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ajuste">Frecuencia de ajuste (meses)</Label>
+                  <Input
+                    id="ajuste"
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={createForm.ajusteFrecuenciaMeses}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, ajusteFrecuenciaMeses: event.target.value }))}
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Ej.: 12 para ajustes anuales.</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="dia">Dia de vencimiento</Label>
-                <Input
-                  id="dia"
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={createForm.diaVencimiento}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, diaVencimiento: event.target.value }))}
-                />
+
+              {/* Sección 5: Fechas */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="inicio">Inicio del contrato</Label>
+                  <Input
+                    id="inicio"
+                    type="date"
+                    value={createForm.fechaInicio}
+                    onChange={(event) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        fechaInicio: event.target.value,
+                        fechaUltimoAjuste: prev.fechaUltimoAjuste || event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Desde cuándo corre el contrato.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ultimo-ajuste">Ultimo ajuste aplicado</Label>
+                  <Input
+                    id="ultimo-ajuste"
+                    type="date"
+                    value={createForm.fechaUltimoAjuste}
+                    min={createForm.fechaInicio || undefined}
+                    max={createForm.fechaFin || undefined}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, fechaUltimoAjuste: event.target.value }))}
+                    required
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Usado para calcular el próximo ajuste. Completa la fecha del último ajuste para estimar el próximo.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="fin">Fin del contrato</Label>
+                  <Input
+                    id="fin"
+                    type="date"
+                    value={createForm.fechaFin}
+                    min={createForm.fechaInicio || undefined}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, fechaFin: event.target.value }))}
+                    required
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Debe ser posterior al inicio.</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="ajuste">Frecuencia de ajuste (meses)</Label>
-                <Input
-                  id="ajuste"
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={createForm.ajusteFrecuenciaMeses}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, ajusteFrecuenciaMeses: event.target.value }))}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="inicio">Fecha inicio</Label>
-                <Input
-                  id="inicio"
-                  type="date"
-                  value={createForm.fechaInicio}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, fechaInicio: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="fin">Fecha fin</Label>
-                <Input
-                  id="fin"
-                  type="date"
-                  value={createForm.fechaFin}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, fechaFin: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Button type="submit" disabled={!createForm.propietarioId || !createForm.inquilinoId || loadingUsers}>
+
+              {/* Información del próximo ajuste */}
+              {createForm.fechaUltimoAjuste && createForm.ajusteFrecuenciaMeses && (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Próximo ajuste automático estimado:</strong> {formatDate(
+                      addMonthsToDate(
+                        new Date(createForm.fechaUltimoAjuste),
+                        Number(createForm.ajusteFrecuenciaMeses || 0) || 1
+                      ).toISOString()
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* Botón de envío */}
+              <div className="flex justify-start">
+                <Button
+                  type="submit"
+                  disabled={
+                    !createForm.propietarioId ||
+                    !createForm.inquilinoId ||
+                    !createForm.fechaUltimoAjuste ||
+                    loadingUsers
+                  }
+                >
                   Crear contrato
                 </Button>
               </div>
@@ -669,6 +949,7 @@ export const AdminDashboard = ({
                 fechaInicio: contrato.fechaInicio?.slice(0, 10) ?? "",
                 fechaFin: contrato.fechaFin?.slice(0, 10) ?? "",
                 ajusteFrecuenciaMeses: String(contrato.ajusteFrecuenciaMeses ?? 12),
+                fechaUltimoAjuste: contrato.fechaUltimoAjuste?.slice(0, 10) ?? "",
               };
               const ajuste = ajusteForms[contrato.id] ?? {
                 metodo: "ICL",
@@ -677,6 +958,12 @@ export const AdminDashboard = ({
                 tasaMensual: "0.02",
                 indices: "",
               };
+
+              const ultimoAjusteDate = parseDate(contrato.fechaUltimoAjuste);
+              const proximoAjusteDate = ultimoAjusteDate
+                ? addMonthsToDate(ultimoAjusteDate, contrato.ajusteFrecuenciaMeses)
+                : null;
+              const ajusteDisponible = !proximoAjusteDate || proximoAjusteDate <= new Date();
 
               const pagosPendientes = contrato.pagos?.filter((pago) => pago.estado === "PENDIENTE").length ?? 0;
               const ultimoPago = contrato.pagos?.slice().sort((a, b) => comparePeriod(b.mes, a.mes))[0];
@@ -723,6 +1010,14 @@ export const AdminDashboard = ({
                     <div>
                       <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Fin</p>
                       <p>{formatDate(contrato.fechaFin)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Ultimo ajuste</p>
+                      <p>{formatDate(contrato.fechaUltimoAjuste)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Proximo ajuste</p>
+                      <p>{proximoAjusteDate ? formatDate(proximoAjusteDate.toISOString()) : "-"}</p>
                     </div>
                   </div>
 
@@ -796,6 +1091,19 @@ export const AdminDashboard = ({
                             setEditorForms((prev) => ({
                               ...prev,
                               [contrato.id]: { ...editor, fechaInicio: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Ultimo ajuste</Label>
+                        <Input
+                          type="date"
+                          value={editor.fechaUltimoAjuste}
+                          onChange={(event) =>
+                            setEditorForms((prev) => ({
+                              ...prev,
+                              [contrato.id]: { ...editor, fechaUltimoAjuste: event.target.value },
                             }))
                           }
                         />
@@ -1029,3 +1337,40 @@ export const AdminDashboard = ({
     </>
   );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
