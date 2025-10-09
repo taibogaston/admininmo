@@ -50,11 +50,23 @@ export const listContratoDescuentos = async (contratoId: string, actor: AuthToke
 };
 
 export const listDescuentos = async (actor: AuthTokenPayload) => {
-  if (actor.role !== UserRole.ADMIN) {
-    throw new HttpError(403, "Solo el administrador puede ver todos los descuentos");
+  if (actor.role === UserRole.SUPER_ADMIN) {
+    return prisma.descuento.findMany({
+      include: {
+        contrato: {
+          include: { propietario: true, inquilino: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  if (actor.role !== UserRole.ADMIN || !actor.inmobiliariaId) {
+    throw new HttpError(403, "Solo el administrador puede ver los descuentos");
   }
 
   return prisma.descuento.findMany({
+    where: { contrato: { inmobiliariaId: actor.inmobiliariaId } },
     include: {
       contrato: {
         include: { propietario: true, inquilino: true },
@@ -65,11 +77,32 @@ export const listDescuentos = async (actor: AuthTokenPayload) => {
 };
 
 export const updateDescuentoEstado = async (descuentoId: string, actor: AuthTokenPayload, data: unknown) => {
-  if (actor.role !== UserRole.ADMIN) {
+  if (actor.role !== UserRole.ADMIN && actor.role !== UserRole.SUPER_ADMIN) {
     throw new HttpError(403, "Solo el administrador puede actualizar descuentos");
   }
 
   const parsed = descuentoEstadoSchema.parse(data);
+
+  const descuento = await prisma.descuento.findUnique({
+    where: { id: descuentoId },
+    include: {
+      contrato: {
+        include: { propietario: true, inquilino: true },
+      },
+    },
+  });
+
+  if (!descuento) {
+    throw new HttpError(404, "Descuento no encontrado");
+  }
+
+  if (
+    actor.role === UserRole.ADMIN &&
+    actor.inmobiliariaId &&
+    descuento.contrato.inmobiliariaId !== actor.inmobiliariaId
+  ) {
+    throw new HttpError(403, "No tienes acceso a este descuento");
+  }
 
   return prisma.descuento.update({
     where: { id: descuentoId },
@@ -81,3 +114,4 @@ export const updateDescuentoEstado = async (descuentoId: string, actor: AuthToke
     },
   });
 };
+

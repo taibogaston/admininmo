@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   PROPIETARIO
   INQUILINO
@@ -59,14 +60,20 @@ model User {
   cbu          String?
   banco        String?
   createdAt    DateTime      @default(now())
+  inmobiliaria   Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
+  inmobiliariaId String?
   contratosPropietario Contrato[] @relation("PropietarioContratos")
   contratosInquilino   Contrato[] @relation("InquilinoContratos")
   transferenciasVerificadas Transferencia[] @relation("VerificadorTransferencias")
   descuentosSolicitados Descuento[] @relation("InquilinoDescuentos")
+
+  @@index([inmobiliariaId])
 }
 
 model Contrato {
   id             String            @id @default(cuid())
+  inmobiliaria   Inmobiliaria      @relation(fields: [inmobiliariaId], references: [id])
+  inmobiliariaId String
   propietario    User              @relation("PropietarioContratos", fields: [propietarioId], references: [id])
   propietarioId  String
   inquilino      User              @relation("InquilinoContratos", fields: [inquilinoId], references: [id])
@@ -86,6 +93,7 @@ model Contrato {
   movimientos    Movimiento[]
   descuentos     Descuento[]
 
+  @@index([inmobiliariaId])
   @@index([propietarioId])
   @@index([inquilinoId])
   @@index([estado])
@@ -170,4 +178,14 @@ model Descuento {
 
   @@index([contratoId])
   @@index([estado])
+}
+
+model Inmobiliaria {
+  id        String    @id @default(cuid())
+  nombre    String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  usuarios  User[]
+  contratos Contrato[]
 }

@@ -1,4 +1,4 @@
-ï»¿import { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getPrisma } from "../utils/prisma";
 import { HttpError } from "../utils/errors";
@@ -18,8 +18,8 @@ const generateSchema = z.object({
 type GenerateInput = z.infer<typeof generateSchema>;
 
 export const generatePago = async (data: unknown, actor: AuthTokenPayload) => {
-  if (![UserRole.ADMIN, UserRole.PROPIETARIO].includes(actor.role)) {
-    throw new HttpError(403, "No tenÃ©s permisos para generar pagos");
+  if (![UserRole.ADMIN, UserRole.PROPIETARIO, UserRole.SUPER_ADMIN].includes(actor.role)) {
+    throw new HttpError(403, "No tenés permisos para generar pagos");
   }
   const parsed: GenerateInput = generateSchema.parse(data);
 
@@ -74,7 +74,7 @@ export const createMercadoPagoPreference = async (pagoId: string, actor: AuthTok
   const pago = await getPagoById(pagoId, actor);
 
   if (!env.MP_ACCESS_TOKEN || env.MP_ACCESS_TOKEN.trim() === "") {
-    throw new HttpError(400, "MercadoPago no estÃ¡ configurado. Configura MP_ACCESS_TOKEN para usar Mercado Pago");
+    throw new HttpError(400, "MercadoPago no está configurado. Configura MP_ACCESS_TOKEN para usar Mercado Pago");
   }
 
   // Temporal: MercadoPago no configurado, retornar error informativo
@@ -110,7 +110,7 @@ export const markPagoAsApproved = async (
 
 export const processMercadoPagoWebhook = async (payload: any, _signature?: string) => {
   if (!env.MP_ACCESS_TOKEN || env.MP_ACCESS_TOKEN.trim() === "") {
-    throw new HttpError(400, "MercadoPago no estÃ¡ configurado");
+    throw new HttpError(400, "MercadoPago no está configurado");
   }
 
   const type = payload?.type ?? payload?.type_id;
@@ -121,13 +121,13 @@ export const processMercadoPagoWebhook = async (payload: any, _signature?: strin
 
   const paymentId = payload?.data?.id || payload?.id;
   if (!paymentId) {
-    throw new HttpError(400, "Webhook invÃ¡lido");
+    throw new HttpError(400, "Webhook inválido");
   }
 
   // Temporal: MercadoPago no configurado
   throw new HttpError(503, "Webhook de MercadoPago temporalmente deshabilitado. Configura MP_ACCESS_TOKEN para habilitarlo.");
   
-  /* CÃ³digo comentado temporalmente:
+  /* Código comentado temporalmente:
   const response = await mpClient.payment.findById(paymentId);
   const payment = response.body;
   const externalRef = payment.external_reference;
@@ -161,8 +161,8 @@ export const registerTransferencia = async (
 ) => {
   const pago = await getPagoById(pagoId, actor);
 
-  if (actor.role !== UserRole.INQUILINO && actor.role !== UserRole.ADMIN) {
-    throw new HttpError(403, "SÃ³lo el inquilino puede cargar comprobantes");
+  if (actor.role !== UserRole.INQUILINO && actor.role !== UserRole.ADMIN && actor.role !== UserRole.SUPER_ADMIN) {
+    throw new HttpError(403, "Sólo el inquilino puede cargar comprobantes");
   }
 
   if (actor.role === UserRole.INQUILINO && pago.contrato.inquilinoId !== actor.id) {
@@ -197,3 +197,4 @@ export const listPagosByContrato = async (contratoId: string, actor: AuthTokenPa
     orderBy: { mes: "desc" },
   });
 };
+

@@ -7,5 +7,6 @@ export const descuentosRoutes = Router();
 
 descuentosRoutes.use(requireAuth);
 
-descuentosRoutes.get("/", requireRole(UserRole.ADMIN), listDescuentosController);
-descuentosRoutes.patch("/:id", requireRole(UserRole.ADMIN), updateDescuentoEstadoController);
+descuentosRoutes.get("/", requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN), listDescuentosController);
+descuentosRoutes.patch("/:id", requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN), updateDescuentoEstadoController);
+

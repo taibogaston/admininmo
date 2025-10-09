@@ -6,6 +6,7 @@ import {
   MovimientoTipo,
   TransferenciaEstado,
   DescuentoEstado,
+  InmobiliariaSummary,
 } from "@admin-inmo/shared";
 
 export interface User {
@@ -14,6 +15,8 @@ export interface User {
   nombre: string;
   apellido: string;
   rol: UserRole;
+  inmobiliariaId: string | null;
+  inmobiliaria?: InmobiliariaSummary | null;
 }
 
 export interface ContratoArchivo {
@@ -57,6 +60,7 @@ export interface Descuento {
 
 export interface Contrato {
   id: string;
+  inmobiliariaId: string;
   direccion: string;
   montoMensual: string;
   comisionMensual: string;
@@ -94,3 +98,12 @@ export interface DescuentoDetalle extends Descuento {
     inquilino?: User;
   };
 }
+
+export type Inmobiliaria = InmobiliariaSummary;
+
+export interface InmobiliariaWithCounts extends InmobiliariaSummary {
+  usuarios: number;
+  contratos: number;
+}
+
+

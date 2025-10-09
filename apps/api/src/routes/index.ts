@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { authRoutes } from "./authRoutes";
 import { contratosRoutes } from "./contractsRoutes";
 import { pagosRoutes } from "./paymentsRoutes";
@@ -7,11 +7,13 @@ import { ajustesRoutes } from "./ajustesRoutes";
 import { descuentosRoutes } from "./descuentosRoutes";
 import { webhookRoutes } from "./webhookRoutes";
 import { userRoutes } from "./userRoutes";
+import { inmobiliariaRoutes } from "./inmobiliariaRoutes";
 import { authLimiter } from "../middlewares/rateLimiter";
 
 export const router = Router();
 
 router.use("/auth", authLimiter, authRoutes);
+router.use("/inmobiliarias", inmobiliariaRoutes);
 router.use("/usuarios", userRoutes);
 router.use("/contratos", contratosRoutes);
 router.use("/pagos", pagosRoutes);

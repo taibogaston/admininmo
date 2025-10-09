@@ -12,6 +12,9 @@
     "kill:ports": "node scripts/kill-ports.js",
     "postinstall": "npm run prisma:generate --workspace=@admin-inmo/api"
   },
+  "prisma": {
+    "schema": "apps/api/prisma/schema.prisma"
+  },
   "devDependencies": {
     "concurrently": "^8.2.0"
   }

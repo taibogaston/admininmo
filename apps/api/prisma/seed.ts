@@ -4,28 +4,57 @@ import { UserRole } from "@admin-inmo/shared";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  const adminEmail = "admin@local.test";
-  const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
-  if (!existing) {
+async function ensureSuperAdmin() {
+  const email = "root@rentapp.test";
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log("Super admin already exists", email);
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash("root1234", 10);
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      nombre: "Root",
+      apellido: "Admin",
+      rol: UserRole.SUPER_ADMIN,
+    },
+  });
+  console.log("Seeded super admin user", email);
+}
+
+async function ensureDemoInmobiliaria() {
+  const inmobiliaria = await prisma.inmobiliaria.upsert({
+    where: { slug: "demo-inmobiliaria" },
+    create: {
+      nombre: "Demo Inmobiliaria",
+      slug: "demo-inmobiliaria",
+    },
+    update: {},
+  });
+
+  const adminEmail = "admin@demo.test";
+  const adminExisting = await prisma.user.findUnique({ where: { email: adminEmail } });
+  if (!adminExisting) {
     const passwordHash = await bcrypt.hash("admin123", 10);
     await prisma.user.create({
       data: {
         email: adminEmail,
         passwordHash,
         nombre: "Admin",
-        apellido: "Local",
+        apellido: "Demo",
         rol: UserRole.ADMIN,
+        inmobiliariaId: inmobiliaria.id,
       },
     });
-    console.log("Seeded admin user", adminEmail);
-  } else {
-    console.log("Admin user already exists", adminEmail);
+    console.log("Seeded demo admin", adminEmail);
   }
 
-  const ownerEmail = "dueno@local.test";
-  const existingOwner = await prisma.user.findUnique({ where: { email: ownerEmail } });
-  if (!existingOwner) {
+  const ownerEmail = "dueno@demo.test";
+  const ownerExisting = await prisma.user.findUnique({ where: { email: ownerEmail } });
+  if (!ownerExisting) {
     const passwordHash = await bcrypt.hash("dueno123", 10);
     await prisma.user.create({
       data: {
@@ -34,16 +63,15 @@ async function main() {
         nombre: "Juan",
         apellido: "Dueno",
         rol: UserRole.PROPIETARIO,
+        inmobiliariaId: inmobiliaria.id,
       },
     });
-    console.log("Seeded owner user", ownerEmail);
-  } else {
-    console.log("Owner user already exists", ownerEmail);
+    console.log("Seeded demo owner", ownerEmail);
   }
 
-  const tenantEmail = "inquilino@local.test";
-  const existingTenant = await prisma.user.findUnique({ where: { email: tenantEmail } });
-  if (!existingTenant) {
+  const tenantEmail = "inquilino@demo.test";
+  const tenantExisting = await prisma.user.findUnique({ where: { email: tenantEmail } });
+  if (!tenantExisting) {
     const passwordHash = await bcrypt.hash("inquilino123", 10);
     await prisma.user.create({
       data: {
@@ -52,12 +80,16 @@ async function main() {
         nombre: "Maria",
         apellido: "Inquilina",
         rol: UserRole.INQUILINO,
+        inmobiliariaId: inmobiliaria.id,
       },
     });
-    console.log("Seeded tenant user", tenantEmail);
-  } else {
-    console.log("Tenant user already exists", tenantEmail);
+    console.log("Seeded demo tenant", tenantEmail);
   }
+}
+
+async function main() {
+  await ensureSuperAdmin();
+  await ensureDemoInmobiliaria();
 }
 
 main()

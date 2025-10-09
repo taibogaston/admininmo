@@ -1,4 +1,4 @@
-﻿import { ReactNode } from "react";
+import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/server-api";
 import { User } from "@/lib/types";
@@ -6,19 +6,19 @@ import { UserRole } from "@admin-inmo/shared";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
-interface AdminLayoutProps {
+interface SuperAdminLayoutProps {
   children: ReactNode;
 }
 
-export default async function AdminLayout({ children }: AdminLayoutProps) {
+export default async function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   let user: User;
   try {
     user = await serverApiFetch<User>("/api/auth/me");
-  } catch (error) {
+  } catch (_error) {
     redirect("/login");
   }
 
-  if (user.rol !== UserRole.ADMIN) {
+  if (user.rol !== UserRole.SUPER_ADMIN) {
     redirect("/dashboard");
   }
 
@@ -28,24 +28,21 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex flex-col">
             <span className="text-xs uppercase tracking-[0.4em] text-slate-500 dark:text-slate-500">
-              {user.inmobiliaria?.nombre ?? "Sin inmobiliaria"}
+              Super Admin
             </span>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Admin Inmobiliaria</h1>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">RentApp Control</h1>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden items-center gap-2 text-sm text-slate-600 dark:text-slate-300 md:flex">
               <span aria-hidden>&bull;</span>
               <span>{user.nombre} {user.apellido}</span>
-              <span aria-hidden>&bull;</span>
-              <span className="capitalize">{user.rol.toLowerCase()}</span>
             </div>
             <ThemeToggle />
             <LogoutButton />
           </div>
         </div>
       </header>
-
-      <div className="flex pt-20 md:pt-24">{children}</div>
+      <main className="px-4 pb-12 pt-24 md:px-8">{children}</main>
     </div>
   );
 }

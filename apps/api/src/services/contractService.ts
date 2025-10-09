@@ -23,9 +23,44 @@ type ContractInput = z.infer<typeof contractInputSchema>;
 
 const contractUpdateSchema = contractInputSchema.partial();
 
-export const listContractsForUser = async (actor: AuthTokenPayload) => {
+const ensureTenantAdmin = (actor: AuthTokenPayload) => {
+  if (actor.role === UserRole.SUPER_ADMIN) {
+    return;
+  }
+  if (actor.role !== UserRole.ADMIN) {
+    throw new HttpError(403, "Solo administradores pueden realizar esta accion");
+  }
+  if (!actor.inmobiliariaId) {
+    throw new HttpError(400, "Administrador sin inmobiliaria asociada");
+  }
+};
+
+const ensureTenantAccess = (actor: AuthTokenPayload, inmobiliariaId: string) => {
+  if (actor.role === UserRole.SUPER_ADMIN) {
+    return;
+  }
   if (actor.role === UserRole.ADMIN) {
+    if (!actor.inmobiliariaId || actor.inmobiliariaId !== inmobiliariaId) {
+      throw new HttpError(403, "No tienes acceso a esta inmobiliaria");
+    }
+    return;
+  }
+};
+
+export const listContractsForUser = async (actor: AuthTokenPayload) => {
+  if (actor.role === UserRole.SUPER_ADMIN) {
     return prisma.contrato.findMany({
+      include: { propietario: true, inquilino: true, pagos: true, descuentos: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  if (actor.role === UserRole.ADMIN) {
+    if (!actor.inmobiliariaId) {
+      throw new HttpError(400, "Administrador sin inmobiliaria asociada");
+    }
+    return prisma.contrato.findMany({
+      where: { inmobiliariaId: actor.inmobiliariaId },
       include: { propietario: true, inquilino: true, pagos: true, descuentos: true },
       orderBy: { createdAt: "desc" },
     });
@@ -47,8 +82,15 @@ export const listContractsForUser = async (actor: AuthTokenPayload) => {
 };
 
 export const createContract = async (data: unknown, actor: AuthTokenPayload) => {
+  ensureTenantAdmin(actor);
+
   if (actor.role !== UserRole.ADMIN) {
     throw new HttpError(403, "Solo un administrador puede crear contratos");
+  }
+
+  const tenantId = actor.inmobiliariaId;
+  if (!tenantId) {
+    throw new HttpError(400, "Administrador sin inmobiliaria asociada");
   }
 
   const parsed = contractInputSchema.parse(data);
@@ -66,12 +108,17 @@ export const createContract = async (data: unknown, actor: AuthTokenPayload) => 
     throw new HttpError(400, "Inquilino invalido");
   }
 
+  if (propietario.inmobiliariaId !== tenantId || inquilino.inmobiliariaId !== tenantId) {
+    throw new HttpError(403, "Los usuarios deben pertenecer a la misma inmobiliaria");
+  }
+
   if (parsed.fechaFin <= parsed.fechaInicio) {
     throw new HttpError(400, "La fecha de fin debe ser posterior a la fecha de inicio");
   }
 
   return prisma.contrato.create({
     data: {
+      inmobiliariaId: tenantId,
       propietarioId: parsed.propietarioId,
       inquilinoId: parsed.inquilinoId,
       direccion: parsed.direccion,
@@ -87,14 +134,14 @@ export const createContract = async (data: unknown, actor: AuthTokenPayload) => 
 };
 
 export const updateContract = async (contratoId: string, data: unknown, actor: AuthTokenPayload) => {
-  if (actor.role !== UserRole.ADMIN) {
-    throw new HttpError(403, "Solo un administrador puede actualizar contratos");
-  }
+  ensureTenantAdmin(actor);
 
   const existing = await prisma.contrato.findUnique({ where: { id: contratoId } });
   if (!existing) {
     throw new HttpError(404, "Contrato no encontrado");
   }
+
+  ensureTenantAccess(actor, existing.inmobiliariaId);
 
   const parsed = contractUpdateSchema.parse(data);
 
@@ -105,9 +152,23 @@ export const updateContract = async (contratoId: string, data: unknown, actor: A
   const dataToUpdate: Prisma.ContratoUpdateInput = {};
 
   if (parsed.propietarioId) {
+    const propietario = await prisma.user.findUnique({ where: { id: parsed.propietarioId } });
+    if (!propietario || propietario.rol !== UserRole.PROPIETARIO) {
+      throw new HttpError(400, "Propietario invalido");
+    }
+    if (propietario.inmobiliariaId !== existing.inmobiliariaId) {
+      throw new HttpError(403, "El propietario debe pertenecer a la misma inmobiliaria");
+    }
     dataToUpdate.propietario = { connect: { id: parsed.propietarioId } };
   }
   if (parsed.inquilinoId) {
+    const inquilino = await prisma.user.findUnique({ where: { id: parsed.inquilinoId } });
+    if (!inquilino || inquilino.rol !== UserRole.INQUILINO) {
+      throw new HttpError(400, "Inquilino invalido");
+    }
+    if (inquilino.inmobiliariaId !== existing.inmobiliariaId) {
+      throw new HttpError(403, "El inquilino debe pertenecer a la misma inmobiliaria");
+    }
     dataToUpdate.inquilino = { connect: { id: parsed.inquilinoId } };
   }
   if (parsed.direccion !== undefined) dataToUpdate.direccion = parsed.direccion;
@@ -143,11 +204,20 @@ export const assertContratoAccess = async (contratoId: string, actor: AuthTokenP
     throw new HttpError(404, "Contrato no encontrado");
   }
 
-  if (
-    actor.role !== UserRole.ADMIN &&
-    contrato.propietarioId !== actor.id &&
-    contrato.inquilinoId !== actor.id
-  ) {
+  if (actor.role === UserRole.SUPER_ADMIN) {
+    return contrato;
+  }
+
+  if (actor.role === UserRole.ADMIN) {
+    ensureTenantAccess(actor, contrato.inmobiliariaId);
+    return contrato;
+  }
+
+  if (actor.role !== UserRole.PROPIETARIO && actor.role !== UserRole.INQUILINO) {
+    throw new HttpError(403, "No tienes acceso a este contrato");
+  }
+
+  if (contrato.propietarioId !== actor.id && contrato.inquilinoId !== actor.id) {
     throw new HttpError(403, "No tienes acceso a este contrato");
   }
 
@@ -203,5 +273,7 @@ export const getContratoMovimientos = async (contratoId: string, actor: AuthToke
     orderBy: { fecha: "desc" },
   });
 };
+
+
 
 

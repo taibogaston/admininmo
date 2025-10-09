@@ -1,11 +1,11 @@
-﻿import mercadopago from "mercadopago";
-import { env } from "../env";
+﻿import { env } from "../env";
 
-// Only configure MercadoPago if we have a token
+const mercadopagoMod = require("mercadopago") as any;
+
 if (env.MP_ACCESS_TOKEN && env.MP_ACCESS_TOKEN.trim() !== "") {
-  mercadopago.configure({
+  mercadopagoMod.configure({
     access_token: env.MP_ACCESS_TOKEN,
   });
 }
 
-export const mpClient = mercadopago;
+export const mpClient = mercadopagoMod;

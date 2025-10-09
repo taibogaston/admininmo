@@ -1,4 +1,5 @@
-﻿export enum UserRole {
+export enum UserRole {
+  SUPER_ADMIN = "SUPER_ADMIN",
   ADMIN = "ADMIN",
   PROPIETARIO = "PROPIETARIO",
   INQUILINO = "INQUILINO",
@@ -43,6 +44,7 @@ export type AuthTokenPayload = {
   id: string;
   email: string;
   role: UserRole;
+  inmobiliariaId: string | null;
 };
 
 export type AjusteMetodo = "ICL" | "IPC";
@@ -62,4 +64,12 @@ export interface AjusteResponse {
   montoBase: number;
   montoAjustado: number;
   detalle: string;
+}
+
+export interface InmobiliariaSummary {
+  id: string;
+  nombre: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
 }

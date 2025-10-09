@@ -13,7 +13,7 @@ export const LogoutButton = () => {
 
   return (
     <Button variant="outline" onClick={handleLogout}>
-      Cerrar sesión
+      Cerrar sesion
     </Button>
   );
 };

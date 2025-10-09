@@ -18,6 +18,7 @@ export const createUserController = async (req: AuthenticatedRequest, res: Respo
     rol: user.rol,
     nombre: user.nombre,
     apellido: user.apellido,
+    inmobiliariaId: user.inmobiliariaId ?? null,
   });
 };
 
@@ -28,6 +29,8 @@ export const listUsersController = async (req: AuthenticatedRequest, res: Respon
     .map((role) => (typeof role === "string" ? role.toUpperCase() : null))
     .filter((role): role is keyof typeof UserRole => !!role && role in UserRole)
     .map((role) => UserRole[role]);
-  const users = await listUsers(parsedRoles);
+  const inmobiliariaId =
+    typeof req.query.inmobiliariaId === "string" ? req.query.inmobiliariaId : undefined;
+  const users = await listUsers(parsedRoles, req.user, inmobiliariaId);
   res.json(users);
 };

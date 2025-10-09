@@ -1,4 +1,4 @@
-﻿import { Request, Response } from "express";
+import { Request, Response } from "express";
 import { signToken } from "../auth";
 import { env } from "../env";
 import { registerUser, authenticateUser, getUserById } from "../services/authService";
@@ -26,6 +26,16 @@ export const registerController = async (req: AuthenticatedRequest, res: Respons
     rol: user.rol,
     nombre: user.nombre,
     apellido: user.apellido,
+    inmobiliariaId: user.inmobiliariaId ?? null,
+    inmobiliaria: user.inmobiliaria
+      ? {
+          id: user.inmobiliaria.id,
+          nombre: user.inmobiliaria.nombre,
+          slug: user.inmobiliaria.slug,
+          createdAt: user.inmobiliaria.createdAt.toISOString(),
+          updatedAt: user.inmobiliaria.updatedAt.toISOString(),
+        }
+      : null,
   });
 };
 
@@ -42,6 +52,16 @@ export const loginController = async (req: Request, res: Response) => {
         rol: user.rol,
         nombre: user.nombre,
         apellido: user.apellido,
+        inmobiliariaId: user.inmobiliariaId ?? null,
+        inmobiliaria: user.inmobiliaria
+          ? {
+              id: user.inmobiliaria.id,
+              nombre: user.inmobiliaria.nombre,
+              slug: user.inmobiliaria.slug,
+              createdAt: user.inmobiliaria.createdAt.toISOString(),
+              updatedAt: user.inmobiliaria.updatedAt.toISOString(),
+            }
+          : null,
       },
     });
 };
@@ -58,10 +78,21 @@ export const meController = async (req: AuthenticatedRequest, res: Response) => 
     rol: user.rol,
     nombre: user.nombre,
     apellido: user.apellido,
+    inmobiliariaId: user.inmobiliariaId ?? null,
+    inmobiliaria: user.inmobiliaria
+      ? {
+          id: user.inmobiliaria.id,
+          nombre: user.inmobiliaria.nombre,
+          slug: user.inmobiliaria.slug,
+          createdAt: user.inmobiliaria.createdAt.toISOString(),
+          updatedAt: user.inmobiliaria.updatedAt.toISOString(),
+        }
+      : null,
   });
 };
 
 export const logoutController = async (_req: Request, res: Response) => {
   res.clearCookie(JWT_COOKIE_NAME, { ...COOKIE_OPTIONS, maxAge: 0 });
-  res.json({ message: "Sesión cerrada" });
+  res.json({ message: "Sesi�n cerrada" });
 };
+

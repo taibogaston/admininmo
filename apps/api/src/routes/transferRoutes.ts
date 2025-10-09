@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import {
   transferenciasPendientesController,
   verificarTransferenciaController,
@@ -9,8 +9,9 @@ import { UserRole } from "@admin-inmo/shared";
 
 export const transferRoutes = Router();
 
-transferRoutes.use(requireAuth, requireRole(UserRole.ADMIN));
+transferRoutes.use(requireAuth, requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN));
 
 transferRoutes.get("/pendientes", transferenciasPendientesController);
 transferRoutes.get("/:id/comprobante", transferenciaComprobanteController);
 transferRoutes.post("/:id/verificar", verificarTransferenciaController);
+

@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import {
   generatePagoController,
   createPreferenceController,
@@ -13,7 +13,8 @@ export const pagosRoutes = Router();
 
 pagosRoutes.use(requireAuth);
 
-pagosRoutes.post("/generar", requireRole(UserRole.ADMIN, UserRole.PROPIETARIO), generatePagoController);
+pagosRoutes.post("/generar", requireRole(UserRole.ADMIN, UserRole.PROPIETARIO, UserRole.SUPER_ADMIN), generatePagoController);
 pagosRoutes.post("/:pagoId/mp/preference", createPreferenceController);
 pagosRoutes.post("/:pagoId/transferencia", transferenciaUpload.single("comprobante"), registerTransferenciaController);
 pagosRoutes.get("/:pagoId", getPagoController);
+
