@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/server-api";
-import { User, Contrato, DescuentoDetalle, Transferencia } from "@/lib/types";
+import { User, Contrato } from "@/lib/types";
 import { UserRole } from "@admin-inmo/shared";
 import { LogoutButton } from "@/components/LogoutButton";
 import { TenantDashboard } from "@/components/dashboard/TenantDashboard";
 import { OwnerDashboard } from "@/components/dashboard/OwnerDashboard";
-import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 
 export default async function DashboardPage() {
   let user: User;
@@ -15,36 +14,37 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const contratos = await serverApiFetch<Contrato[]>("/api/contratos");
-
-  // Solo cargar datos adicionales para admin
-  let descuentos: DescuentoDetalle[] = [];
-  let transferencias: Transferencia[] = [];
-  
   if (user.rol === UserRole.ADMIN) {
-    descuentos = await serverApiFetch<DescuentoDetalle[]>("/api/descuentos");
-    transferencias = await serverApiFetch<Transferencia[]>("/api/transferencias/pendientes");
+    redirect("/dashboard/admin/overview");
   }
 
+  const contratos = await serverApiFetch<Contrato[]>("/api/contratos");
+
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-      <header className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Hola, {user.nombre}</h1>
-          <p className="text-sm text-slate-600">Rol: {user.rol}</p>
+    <div className="min-h-screen bg-slate-50">
+      {/* Header fijo */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-slate-900">ADMIN INMO</h1>
+            <div className="hidden md:flex items-center gap-2 text-sm text-slate-600">
+              <span>•</span>
+              <span>Hola, {user.nombre}</span>
+              <span>•</span>
+              <span className="capitalize">{user.rol.toLowerCase()}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <LogoutButton />
+          </div>
         </div>
-        <LogoutButton />
       </header>
 
-      {user.rol === UserRole.INQUILINO && <TenantDashboard contratos={contratos} />}
-      {user.rol === UserRole.PROPIETARIO && <OwnerDashboard contratos={contratos} />}
-      {user.rol === UserRole.ADMIN && (
-        <AdminDashboard 
-          contratos={contratos} 
-          descuentos={descuentos} 
-          transferencias={transferencias} 
-        />
-      )}
+      {/* Layout principal con sidebar y contenido */}
+      <div className="flex pt-16">
+        {user.rol === UserRole.INQUILINO && <TenantDashboard contratos={contratos} />}
+        {user.rol === UserRole.PROPIETARIO && <OwnerDashboard contratos={contratos} />}
+      </div>
     </div>
   );
 }

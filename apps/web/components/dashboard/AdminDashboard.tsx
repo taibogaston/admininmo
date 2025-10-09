@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Contrato, DescuentoDetalle, Transferencia, User } from "@/lib/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/badge";
 import { clientApiFetch } from "@/lib/client-api";
+import { ADMIN_SECTIONS, AdminSection } from "./admin/sections";
+import { cn } from "@/lib/utils";
 
 type UserOption = Pick<User, "id" | "nombre" | "apellido" | "email" | "rol">;
 
@@ -17,6 +20,7 @@ interface AdminDashboardProps {
   contratos: Contrato[];
   transferencias: Transferencia[];
   descuentos: DescuentoDetalle[];
+  activeSection: AdminSection;
 }
 
 interface ContractEditorState {
@@ -57,15 +61,12 @@ const comparePeriod = (mesA: string, mesB: string) => {
   return yearA === yearB ? monthA - monthB : yearA - yearB;
 };
 
-const SECTIONS = [
-  { id: "overview", label: "Resumen" },
-  { id: "assign", label: "Asignar contrato" },
-  { id: "contracts", label: "Contratos" },
-  { id: "discounts", label: "Descuentos" },
-  { id: "transfers", label: "Transferencias" },
-];
-
-export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminDashboardProps) => {
+export const AdminDashboard = ({
+  contratos,
+  transferencias,
+  descuentos,
+  activeSection,
+}: AdminDashboardProps) => {
   const [contracts, setContracts] = useState<Contrato[]>(contratos);
   const [transfers, setTransfers] = useState<Transferencia[]>(transferencias);
   const [discountsState, setDiscountsState] = useState<DescuentoDetalle[]>(descuentos);
@@ -166,6 +167,11 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
     };
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    setMessage(null);
+    setError(null);
+  }, [activeSection]);
 
   const refreshContracts = async () => {
     const refreshed = await clientApiFetch<Contrato[]>("/api/contratos");
@@ -360,29 +366,59 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
 
 
   return (
-    <div className="lg:flex lg:gap-8">
-      <nav className="mb-6 shrink-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:mb-0 lg:w-64">
-        <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Administrador</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-900">Panel de control</h2>
-          <p className="mt-1 text-xs text-slate-500">Accede rapido a cada seccion de gestion.</p>
+    <div className="flex flex-col md:flex-row">
+      <aside
+        className={cn(
+          "relative z-40 w-full min-h-[calc(100vh-4rem)] overflow-y-auto border-b border-slate-200 bg-white text-slate-900 shadow-lg",
+          "md:fixed md:top-16 md:bottom-0 md:left-0 md:w-72 md:min-h-0 md:border-b-0 md:border-r md:border-slate-200 md:shadow-none"
+        )}
+      >
+        <div className="px-6 py-8">
+          <div className="mb-10">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Menu</p>
+            <h2 className="mt-3 text-xl font-semibold text-slate-900">Panel de control</h2>
+            <p className="mt-2 text-sm text-slate-500">Elegi la seccion que queres administrar.</p>
+          </div>
+          <nav>
+            <ul className="space-y-1.5">
+              {ADMIN_SECTIONS.map((section) => {
+                const isActive = section.id === activeSection;
+                const Icon = section.icon;
+                return (
+                  <li key={section.id}>
+                    <Link
+                      href={`/dashboard/admin/${section.id}`}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-slate-100 text-slate-900 shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      )}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-lg border text-sm",
+                          isActive
+                            ? "border-slate-300 bg-white text-slate-900"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                        )}
+                        aria-hidden
+                      >
+                        <Icon className="h-4 w-4" strokeWidth={1.8} />
+                      </span>
+                      <span>{section.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
         </div>
-        <ul className="space-y-2 text-sm font-medium text-slate-600">
-          {SECTIONS.map((section) => (
-            <li key={section.id}>
-              <a
-                href={`#${section.id}`}
-                className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-slate-100 hover:text-slate-900"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden />
-                {section.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      </aside>
 
-      <div className="flex-1 space-y-12">
+      {/* Contenido principal */}
+      <main className="flex-1 space-y-12 px-4 py-10 md:ml-72 md:px-8 md:py-12">
         {(message || error) && (
           <div
             className={`rounded-2xl border px-4 py-3 text-sm ${
@@ -393,41 +429,55 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
           </div>
         )}
 
-        <section
-          id="overview"
-          className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-10 text-white shadow-xl"
-        >
-          <div className="max-w-3xl space-y-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Resumen</p>
-            <h1 className="text-3xl font-semibold sm:text-4xl">Gestion ordenada y sin sobresaltos</h1>
-            <p className="text-sm text-slate-300 sm:text-base">
-              Asigna contratos con todos los datos clave, actualiza montos cuando corresponde y controla los pagos desde
-              un unico lugar.
-            </p>
+        {activeSection === "overview" && (
+          <section
+            id="overview"
+            className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 py-12 text-white shadow-xl"
+          >
+            <div className="max-w-4xl space-y-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Resumen</p>
+                <h1 className="text-4xl font-bold mb-4">Gestion ordenada y sin sobresaltos</h1>
+                <p className="text-base text-slate-300 max-w-2xl">
+                  Asigna contratos con todos los datos clave, actualiza montos cuando corresponde y controla los pagos
+                  desde un unico lugar.
+                </p>
+              </div>
+
+              {/* Cards de métricas */}
+              <div className="grid gap-6 sm:grid-cols-3 mt-10">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur hover:bg-white/10 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <dt className="text-xs uppercase tracking-wider text-slate-300">Contratos activos</dt>
+                    <div className="h-2 w-2 rounded-full bg-green-400"></div>
+                  </div>
+                  <dd className="text-3xl font-bold">{contracts.length}</dd>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur hover:bg-white/10 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <dt className="text-xs uppercase tracking-wider text-slate-300">Descuentos pendientes</dt>
+                    <div className="h-2 w-2 rounded-full bg-yellow-400"></div>
+                  </div>
+                  <dd className="text-3xl font-bold">{discountsState.filter((d) => d.estado === "PENDIENTE").length}</dd>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur hover:bg-white/10 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <dt className="text-xs uppercase tracking-wider text-slate-300">Transferencias a revisar</dt>
+                    <div className="h-2 w-2 rounded-full bg-blue-400"></div>
+                  </div>
+                  <dd className="text-3xl font-bold">{transfers.length}</dd>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+        {activeSection === "assign" && (
+          <section id="assign" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold text-slate-900">Asignar un nuevo contrato</h2>
+            <p className="text-sm text-slate-600">Define monto, comision, fechas y ajustes en pocos pasos.</p>
           </div>
-          <dl className="mt-8 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-              <dt className="text-xs uppercase tracking-wider text-slate-300">Contratos activos</dt>
-              <dd className="text-2xl font-semibold">{contracts.length}</dd>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-              <dt className="text-xs uppercase tracking-wider text-slate-300">Descuentos pendientes</dt>
-              <dd className="text-2xl font-semibold">{discountsState.filter((d) => d.estado === "PENDIENTE").length}</dd>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-              <dt className="text-xs uppercase tracking-wider text-slate-300">Transferencias a revisar</dt>
-              <dd className="text-2xl font-semibold">{transfers.length}</dd>
-            </div>
-          </dl>
-        </section>
-
-
-        <section id="assign" className="space-y-4">
-          <Card className="rounded-3xl border-slate-200 p-6 shadow-md">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-lg">Asignar un nuevo contrato</CardTitle>
-              <p className="text-xs text-slate-500">Define monto, comision, fechas y ajustes en pocos pasos.</p>
-            </div>
+          <Card className="rounded-3xl border-slate-200 p-8 shadow-md">
             <form onSubmit={handleCreateContract} className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="propietario">Propietario</Label>
@@ -541,12 +591,12 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
             </form>
           </Card>
         </section>
-
-
-        <section id="contracts" className="space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Contratos activos</h2>
-            <p className="text-xs text-slate-500">Gestiona montos, comisiones y ajustes desde aqui.</p>
+        )}
+        {activeSection === "contracts" && (
+          <section id="contracts" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold text-slate-900">Contratos activos</h2>
+            <p className="text-sm text-slate-600">Gestiona montos, comisiones y ajustes desde aqui.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {contratosOrdenados.map((contrato) => {
@@ -804,12 +854,12 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
             </p>
           )}
         </section>
-
-
-        <section id="discounts" className="space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Solicitudes de descuento</h2>
-            <p className="text-xs text-slate-500">Aprueba o rechaza los casos enviados por inquilinos.</p>
+        )}
+        {activeSection === "discounts" && (
+          <section id="discounts" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold text-slate-900">Solicitudes de descuento</h2>
+            <p className="text-sm text-slate-600">Aprueba o rechaza los casos enviados por inquilinos.</p>
           </div>
           <div className="space-y-4">
             {discountsState.map((descuento) => (
@@ -850,12 +900,12 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
             )}
           </div>
         </section>
-
-
-        <section id="transfers" className="space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Transferencias pendientes</h2>
-            <p className="text-xs text-slate-500">Verifica comprobantes y deja comentarios si es necesario.</p>
+        )}
+        {activeSection === "transfers" && (
+          <section id="transfers" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold text-slate-900">Transferencias pendientes</h2>
+            <p className="text-sm text-slate-600">Verifica comprobantes y deja comentarios si es necesario.</p>
           </div>
           <div className="space-y-4">
             {transfers.map((item) => (
@@ -902,8 +952,8 @@ export const AdminDashboard = ({ contratos, transferencias, descuentos }: AdminD
             )}
           </div>
         </section>
-      </div>
+        )}
+      </main>
     </div>
   );
 };
-
