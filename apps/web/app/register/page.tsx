@@ -1,6 +1,5 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 
 const registerSchema = z.object({
   nombre: z.string().min(1, "Requerido"),
   apellido: z.string().min(1, "Requerido"),
   email: z.string().email(),
-  password: z.string().min(8, "Mínimo 8 caracteres"),
+  password: z.string().min(8, "Minimo 8 caracteres"),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -28,21 +28,25 @@ export default function RegisterPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: { nombre: "", apellido: "", email: "", password: "" },
   });
-  const [error, setError] = useState<string | null>(null);
 
   const onSubmit = async (values: RegisterValues) => {
-    setError(null);
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, rol: "INQUILINO" }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.message ?? "No se pudo registrar");
-      return;
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, rol: "INQUILINO" }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        const message = data?.message ?? "No se pudo registrar";
+        toast.error(message);
+        return;
+      }
+      toast.success("Cuenta creada, inicia sesion cuando quieras");
+      router.replace("/login");
+    } catch {
+      toast.error("No se pudo conectar con el servidor");
     }
-    router.replace("/login");
   };
 
   return (
@@ -69,17 +73,16 @@ export default function RegisterPage() {
             {errors.email && <p className="text-sm text-rose-600">{errors.email.message}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="password">Contrasena</Label>
             <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
             {errors.password && <p className="text-sm text-rose-600">{errors.password.message}</p>}
           </div>
-          {error && <p className="text-sm text-rose-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Creando..." : "Crear cuenta"}
           </Button>
         </form>
         <p className="text-center text-sm text-slate-600">
-          ¿Ya tenés cuenta? <a href="/login" className="text-primary hover:underline">Ingresá</a>
+          Ya tenes cuenta? <a href="/login" className="text-primary hover:underline">Ingresar</a>
         </p>
       </div>
     </div>

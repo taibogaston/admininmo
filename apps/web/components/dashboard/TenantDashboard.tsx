@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/lib/toast";
 
 interface TenantDashboardProps {
   contratos: Contrato[];
@@ -48,8 +49,6 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [descuentoSubmitting, setDescuentoSubmitting] = useState(false);
   const [mostrarFormularioDescuento, setMostrarFormularioDescuento] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [mensaje, setMensaje] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedContratoId) {
@@ -58,18 +57,24 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       return;
     }
 
-    setError(null);
-    setMensaje(null);
+    let errorReported = false;
+    const reportError = (error: unknown, fallback: string) => {
+      if (errorReported) return;
+      const message = error instanceof Error && error.message ? error.message : fallback;
+      toast.error(message);
+      errorReported = true;
+    };
+
     setPagosLoading(true);
     clientApiFetch<Pago[]>(`/api/contratos/${selectedContratoId}/pagos`)
       .then(setPagos)
-      .catch((err) => setError((prev) => prev ?? err.message))
+      .catch((err) => reportError(err, "No se pudieron cargar los pagos"))
       .finally(() => setPagosLoading(false));
 
     setDescuentosLoading(true);
     clientApiFetch<Descuento[]>(`/api/contratos/${selectedContratoId}/descuentos`)
       .then(setDescuentos)
-      .catch((err) => setError((prev) => prev ?? err.message))
+      .catch((err) => reportError(err, "No se pudieron cargar los descuentos"))
       .finally(() => setDescuentosLoading(false));
   }, [selectedContratoId]);
 
@@ -138,7 +143,8 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       });
       window.location.href = preference.init_point;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo iniciar el pago");
+      const message = err instanceof Error ? err.message : "No se pudo iniciar el pago";
+      toast.error(message);
     }
   };
 
@@ -148,7 +154,8 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       const refreshed = await clientApiFetch<Pago[]>(`/api/contratos/${contratoId}/pagos`);
       setPagos(refreshed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo actualizar los pagos");
+      const message = err instanceof Error ? err.message : "No se pudieron actualizar los pagos";
+      toast.error(message);
     } finally {
       setPagosLoading(false);
     }
@@ -160,7 +167,8 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       const refreshed = await clientApiFetch<Descuento[]>(`/api/contratos/${contratoId}/descuentos`);
       setDescuentos(refreshed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo actualizar los descuentos");
+      const message = err instanceof Error ? err.message : "No se pudieron actualizar los descuentos";
+      toast.error(message);
     } finally {
       setDescuentosLoading(false);
     }
@@ -169,11 +177,9 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const handleTransferSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!pendingPago || !transferFile) {
-      setError("Selecciona un comprobante antes de enviar");
+      toast.error("Selecciona un comprobante antes de enviar");
       return;
     }
-    setError(null);
-    setMensaje(null);
     setTransferSubmitting(true);
 
     const formData = new FormData();
@@ -193,12 +199,13 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
         const text = await response.text();
         throw new Error(text || "No se pudo enviar el comprobante");
       }
-      setMensaje("Comprobante enviado para validacion");
+      toast.success("Comprobante enviado para validacion");
       setTransferFile(null);
       setComentarioTransferencia("");
       await recargarPagos(pendingPago.contratoId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo enviar el comprobante");
+      const message = err instanceof Error ? err.message : "No se pudo enviar el comprobante";
+      toast.error(message);
     } finally {
       setTransferSubmitting(false);
     }
@@ -209,16 +216,14 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
     if (!selectedContratoId) return;
     const monto = Number(descuentoMonto);
     if (!Number.isFinite(monto) || monto <= 0) {
-      setError("Indica un monto valido");
+      toast.error("Indica un monto valido");
       return;
     }
     if (descuentoMotivo.trim().length < 3) {
-      setError("Conta brevemente el motivo del descuento");
+      toast.error("Conta brevemente el motivo del descuento");
       return;
     }
 
-    setError(null);
-    setMensaje(null);
     setDescuentoSubmitting(true);
     try {
       await clientApiFetch(`/api/contratos/${selectedContratoId}/descuentos`, {
@@ -226,13 +231,14 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ monto, motivo: descuentoMotivo.trim() }),
       });
-      setMensaje("Solicitud de descuento enviada");
+      toast.success("Solicitud de descuento enviada");
       setDescuentoMonto("");
       setDescuentoMotivo("");
       setMostrarFormularioDescuento(false);
       await recargarDescuentos(selectedContratoId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo registrar el descuento");
+      const message = err instanceof Error ? err.message : "No se pudo registrar el descuento";
+      toast.error(message);
     } finally {
       setDescuentoSubmitting(false);
     }
@@ -469,10 +475,6 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
           <p className="text-sm font-medium text-slate-900">{ajustesLabel}</p>
         </div>
       </section>
-
-      {(mensaje || error) && (
-        <p className={`text-sm ${mensaje ? "text-emerald-600" : "text-rose-600"}`}>{mensaje ?? error}</p>
-      )}
     </div>
   );
 };

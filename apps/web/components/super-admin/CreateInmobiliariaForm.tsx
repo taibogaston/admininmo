@@ -5,17 +5,14 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/lib/toast";
 
 export const CreateInmobiliariaForm = () => {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
-    setSuccess(null);
     setSubmitting(true);
 
     const form = event.currentTarget;
@@ -45,11 +42,12 @@ export const CreateInmobiliariaForm = () => {
         throw new Error(data.message ?? "No se pudo crear la inmobiliaria");
       }
 
-      setSuccess("Inmobiliaria creada correctamente. Se generó el administrador inicial.");
+      toast.success("Inmobiliaria creada correctamente. Se genero el administrador inicial.");
       form.reset();
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
+      const message = err instanceof Error ? err.message : "Error inesperado";
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -85,16 +83,14 @@ export const CreateInmobiliariaForm = () => {
           <Input id="adminEmail" name="adminEmail" type="email" placeholder="admin@inmobiliaria.com" required />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="adminPassword">Contraseña temporal</Label>
+          <Label htmlFor="adminPassword">Contrasena temporal</Label>
           <Input id="adminPassword" name="adminPassword" type="password" minLength={8} required />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="adminTelefono">Teléfono (opcional)</Label>
+          <Label htmlFor="adminTelefono">Telefono (opcional)</Label>
           <Input id="adminTelefono" name="adminTelefono" type="tel" placeholder="+54..." />
         </div>
         <div className="md:col-span-2 flex flex-col gap-3 pt-2">
-          {error && <p className="text-sm text-rose-500">{error}</p>}
-          {success && <p className="text-sm text-emerald-600">{success}</p>}
           <Button type="submit" className="w-full md:w-auto" disabled={submitting}>
             {submitting ? "Creando..." : "Crear inmobiliaria"}
           </Button>

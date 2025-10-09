@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { clientApiFetch } from "@/lib/client-api";
 import { ADMIN_SECTIONS, AdminSection } from "./admin/sections";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 
 type UserOption = Pick<User, "id" | "nombre" | "apellido" | "email" | "rol">;
 
@@ -75,8 +76,6 @@ export const AdminDashboard = ({
   const [owners, setOwners] = useState<UserOption[]>([]);
   const [tenants, setTenants] = useState<UserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [comentariosTransferencia, setComentariosTransferencia] = useState<Record<string, string>>({});
 
   const [createForm, setCreateForm] = useState({
@@ -153,7 +152,6 @@ export const AdminDashboard = ({
   useEffect(() => {
     const fetchUsers = async () => {
       setLoadingUsers(true);
-      setError(null);
       try {
         const [ownersRes, tenantsRes] = await Promise.all([
           clientApiFetch<UserOption[]>("/api/usuarios?rol=PROPIETARIO"),
@@ -162,18 +160,14 @@ export const AdminDashboard = ({
         setOwners(ownersRes);
         setTenants(tenantsRes);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudieron cargar los usuarios");
+        const message = err instanceof Error ? err.message : "No se pudieron cargar los usuarios";
+        toast.error(message);
       } finally {
         setLoadingUsers(false);
       }
     };
     fetchUsers();
   }, []);
-
-  useEffect(() => {
-    setMessage(null);
-    setError(null);
-  }, [activeSection]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -262,9 +256,6 @@ export const AdminDashboard = ({
 
   const handleCreateContract = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
-    setMessage(null);
-
     try {
       await clientApiFetch("/api/contratos", {
         method: "POST",
@@ -282,7 +273,7 @@ export const AdminDashboard = ({
           estado: "ACTIVO",
         }),
       });
-      setMessage("Contrato creado correctamente");
+      toast.success("Contrato creado correctamente");
       setCreateForm({
         propietarioId: "",
         inquilinoId: "",
@@ -296,7 +287,8 @@ export const AdminDashboard = ({
       });
       await refreshContracts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el contrato");
+      const message = err instanceof Error ? err.message : "No se pudo crear el contrato";
+      toast.error(message);
     }
   };
 
@@ -304,8 +296,6 @@ export const AdminDashboard = ({
   const handleUpdateContract = async (contratoId: string) => {
     const form = editorForms[contratoId];
     if (!form) return;
-    setError(null);
-    setMessage(null);
     try {
       const updated = await clientApiFetch<Contrato>(`/api/contratos/${contratoId}`, {
         method: "PUT",
@@ -320,9 +310,10 @@ export const AdminDashboard = ({
         }),
       });
       setContracts((prev) => prev.map((item) => (item.id === contratoId ? updated : item)));
-      setMessage("Contrato actualizado");
+      toast.success("Contrato actualizado");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo actualizar el contrato");
+      const message = err instanceof Error ? err.message : "No se pudo actualizar el contrato";
+      toast.error(message);
     }
   };
 
@@ -333,7 +324,6 @@ export const AdminDashboard = ({
       ...prev,
       [contratoId]: { ...form, loading: true, resultado: undefined, detalle: undefined },
     }));
-    setError(null);
     try {
       const params = new URLSearchParams({
         metodo: form.metodo,
@@ -359,18 +349,17 @@ export const AdminDashboard = ({
         ...prev,
         [contratoId]: { ...form, loading: false, resultado: undefined, detalle: undefined },
       }));
-      setError(err instanceof Error ? err.message : "No se pudo calcular el ajuste");
+      const message = err instanceof Error ? err.message : "No se pudo calcular el ajuste";
+      toast.error(message);
     }
   };
 
   const handleAplicarAjuste = async (contratoId: string) => {
     const ajuste = ajusteForms[contratoId];
     if (!ajuste || ajuste.resultado === undefined) {
-      setError("Calcula el ajuste antes de aplicarlo");
+      toast.error("Calcula el ajuste antes de aplicarlo");
       return;
     }
-    setError(null);
-    setMessage(null);
     try {
       const updated = await clientApiFetch<Contrato>(`/api/contratos/${contratoId}`, {
         method: "PUT",
@@ -403,15 +392,14 @@ export const AdminDashboard = ({
           detalle: ajuste.detalle,
         },
       }));
-      setMessage("Nuevo monto aplicado al contrato");
+      toast.success("Nuevo monto aplicado al contrato");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo aplicar el ajuste");
+      const message = err instanceof Error ? err.message : "No se pudo aplicar el ajuste";
+      toast.error(message);
     }
   };
 
   const handleActualizarDescuento = async (id: string, estado: "APROBADO" | "RECHAZADO") => {
-    setError(null);
-    setMessage(null);
     try {
       const actualizado = await clientApiFetch<DescuentoDetalle>(`/api/descuentos/${id}`, {
         method: "PATCH",
@@ -419,15 +407,14 @@ export const AdminDashboard = ({
         body: JSON.stringify({ estado }),
       });
       setDiscountsState((prev) => prev.map((item) => (item.id === id ? actualizado : item)));
-      setMessage("Estado de descuento actualizado");
+      toast.success("Estado de descuento actualizado");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo actualizar el descuento");
+      const message = err instanceof Error ? err.message : "No se pudo actualizar el descuento";
+      toast.error(message);
     }
   };
 
   const handleVerificarTransferencia = async (id: string, aprobar: boolean) => {
-    setError(null);
-    setMessage(null);
     try {
       await clientApiFetch(`/api/transferencias/${id}/verificar`, {
         method: "POST",
@@ -435,9 +422,10 @@ export const AdminDashboard = ({
         body: JSON.stringify({ aprobar, comentario: comentariosTransferencia[id] ?? "" }),
       });
       setTransfers((prev) => prev.filter((item) => item.id !== id));
-      setMessage("Transferencia verificada");
+      toast.success("Transferencia verificada");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo verificar la transferencia");
+      const message = err instanceof Error ? err.message : "No se pudo verificar la transferencia";
+      toast.error(message);
     }
   };
 
@@ -502,16 +490,6 @@ export const AdminDashboard = ({
               Navegar
             </Button>
           </div>
-
-        {(message || error) && (
-          <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              message ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-600"
-            }`}
-          >
-            {message ?? error}
-          </div>
-        )}
 
         {activeSection === "overview" && (
           <section

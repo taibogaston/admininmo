@@ -1,4 +1,6 @@
-﻿import { createServer } from "./server";
+// Import types extension for Express Request
+import "./types/express";
+import { createServer } from "./server";
 import { env } from "./env";
 
 const app = createServer();
@@ -7,19 +9,24 @@ const server = app.listen(env.API_PORT, () => {
   console.log(`API listening on port ${env.API_PORT}`);
 });
 
-// Manejar señales de cierre para cerrar el servidor correctamente
-process.on('SIGINT', () => {
-  console.log('\n🛑 Cerrando servidor API...');
+const shutdown = (signal: string) => {
+  console.log(`\nReceived ${signal}. Closing API server...`);
   server.close(() => {
-    console.log('✅ Servidor API cerrado correctamente');
+    console.log("API server closed gracefully.");
     process.exit(0);
   });
+};
+
+const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+signals.forEach((signal) => {
+  process.on(signal, () => shutdown(signal));
 });
 
-process.on('SIGTERM', () => {
-  console.log('\n🛑 Cerrando servidor API...');
-  server.close(() => {
-    console.log('✅ Servidor API cerrado correctamente');
-    process.exit(0);
-  });
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection detected:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception detected:", error);
+  process.exit(1);
 });
