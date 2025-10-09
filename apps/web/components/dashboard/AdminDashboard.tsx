@@ -369,15 +369,15 @@ export const AdminDashboard = ({
     <div className="flex flex-col md:flex-row">
       <aside
         className={cn(
-          "relative z-40 w-full min-h-[calc(100vh-4rem)] overflow-y-auto border-b border-slate-200 bg-white text-slate-900 shadow-lg",
-          "md:fixed md:top-16 md:bottom-0 md:left-0 md:w-72 md:min-h-0 md:border-b-0 md:border-r md:border-slate-200 md:shadow-none"
+          "relative z-40 w-full min-h-[calc(100vh-4rem)] overflow-y-auto border-b border-slate-200 bg-white text-slate-900 shadow-lg transition-colors",
+          "dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-slate-900/40",
+          "md:fixed md:top-16 md:bottom-0 md:left-0 md:w-72 md:min-h-0 md:border-b-0 md:border-r md:border-slate-200 md:shadow-none md:dark:border-slate-800"
         )}
       >
         <div className="px-6 py-8">
           <div className="mb-10">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Menu</p>
-            <h2 className="mt-3 text-xl font-semibold text-slate-900">Panel de control</h2>
-            <p className="mt-2 text-sm text-slate-500">Elegi la seccion que queres administrar.</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Menu</p>
+            <h2 className="mt-3 text-xl font-semibold text-slate-900 dark:text-white">Panel de control</h2>
           </div>
           <nav>
             <ul className="space-y-1.5">
@@ -391,17 +391,17 @@ export const AdminDashboard = ({
                       className={cn(
                         "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
                         isActive
-                          ? "bg-slate-100 text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          ? "bg-slate-100 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white dark:shadow-none"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                       )}
                       aria-current={isActive ? "page" : undefined}
                     >
                       <span
                         className={cn(
-                          "flex h-9 w-9 items-center justify-center rounded-lg border text-sm",
+                          "flex h-9 w-9 items-center justify-center rounded-lg border text-sm transition-colors",
                           isActive
-                            ? "border-slate-300 bg-white text-slate-900"
-                            : "border-slate-200 bg-slate-50 text-slate-500"
+                            ? "border-slate-300 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                         )}
                         aria-hidden
                       >
@@ -436,7 +436,7 @@ export const AdminDashboard = ({
           >
             <div className="max-w-4xl space-y-6">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Resumen</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2 dark:text-slate-500">Resumen</p>
                 <h1 className="text-4xl font-bold mb-4">Gestion ordenada y sin sobresaltos</h1>
                 <p className="text-base text-slate-300 max-w-2xl">
                   Asigna contratos con todos los datos clave, actualiza montos cuando corresponde y controla los pagos
@@ -474,10 +474,10 @@ export const AdminDashboard = ({
         {activeSection === "assign" && (
           <section id="assign" className="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">Asignar un nuevo contrato</h2>
-            <p className="text-sm text-slate-600">Define monto, comision, fechas y ajustes en pocos pasos.</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Asignar un nuevo contrato</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Define monto, comision, fechas y ajustes en pocos pasos.</p>
           </div>
-          <Card className="rounded-3xl border-slate-200 p-8 shadow-md">
+          <Card className="rounded-3xl border-slate-200 p-8 shadow-md dark:border-slate-800 dark:bg-slate-900">
             <form onSubmit={handleCreateContract} className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="propietario">Propietario</Label>
@@ -595,8 +595,8 @@ export const AdminDashboard = ({
         {activeSection === "contracts" && (
           <section id="contracts" className="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">Contratos activos</h2>
-            <p className="text-sm text-slate-600">Gestiona montos, comisiones y ajustes desde aqui.</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Contratos activos</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Gestiona montos, comisiones y ajustes desde aqui.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {contratosOrdenados.map((contrato) => {
@@ -620,49 +620,52 @@ export const AdminDashboard = ({
               const ultimoPago = contrato.pagos?.slice().sort((a, b) => comparePeriod(b.mes, a.mes))[0];
 
               return (
-                <Card key={contrato.id} className="space-y-5 rounded-3xl border-slate-200 p-6 shadow-md">
+                <Card
+                  key={contrato.id}
+                  className="space-y-5 rounded-3xl border-slate-200 p-6 shadow-md dark:border-slate-800 dark:bg-slate-900"
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <CardTitle className="text-lg text-slate-900">{contrato.direccion}</CardTitle>
-                      <CardDescription className="text-slate-500">
+                    <CardTitle className="text-lg text-slate-900 dark:text-white">{contrato.direccion}</CardTitle>
+                      <CardDescription className="text-slate-500 dark:text-slate-300">
                         Inquilino: {contrato.inquilino?.nombre} {contrato.inquilino?.apellido}
                       </CardDescription>
-                      <p className="mt-2 text-xs text-slate-400">
+                      <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
                         Ultimo pago: {ultimoPago ? `${ultimoPago.mes} (${ultimoPago.estado})` : "Sin registrar"}
                       </p>
                     </div>
                     <StatusBadge status={contrato.estado} />
                   </div>
 
-                  <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600 sm:grid-cols-2">
+                  <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Monto mensual</p>
-                      <p className="font-medium text-slate-900">{formatCurrency(contrato.montoMensual)}</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Monto mensual</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(contrato.montoMensual)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Comision</p>
-                      <p className="font-medium text-slate-900">{formatCurrency(contrato.comisionMensual)}</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Comision</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(contrato.comisionMensual)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Vencimiento</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Vencimiento</p>
                       <p>Dia {contrato.diaVencimiento}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Pagos pendientes</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Pagos pendientes</p>
                       <p>{pagosPendientes}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Inicio</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Inicio</p>
                       <p>{formatDate(contrato.fechaInicio)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Fin</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Fin</p>
                       <p>{formatDate(contrato.fechaFin)}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-4 rounded-2xl border border-slate-100 p-4">
-                    <p className="text-sm font-semibold text-slate-900">Editar datos principales</p>
+                  <div className="space-y-4 rounded-2xl border border-slate-100 p-4 transition-colors dark:border-slate-800 dark:bg-slate-900/40">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Editar datos principales</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
                         <Label>Monto mensual</Label>
@@ -755,8 +758,8 @@ export const AdminDashboard = ({
                   </div>
 
 
-                  <div className="space-y-4 rounded-2xl border border-slate-100 p-4">
-                    <p className="text-sm font-semibold text-slate-900">Calcular y aplicar ajuste</p>
+                  <div className="space-y-4 rounded-2xl border border-slate-100 p-4 transition-colors dark:border-slate-800 dark:bg-slate-900/40">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Calcular y aplicar ajuste</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
                         <Label>Metodo</Label>
@@ -842,14 +845,14 @@ export const AdminDashboard = ({
                         </Button>
                       )}
                     </div>
-                    {ajuste.detalle && <p className="text-xs text-slate-500">{ajuste.detalle}</p>}
+                    {ajuste.detalle && <p className="text-xs text-slate-500 dark:text-slate-400">{ajuste.detalle}</p>}
                   </div>
                 </Card>
               );
             })}
           </div>
           {contratosOrdenados.length === 0 && (
-            <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">
+            <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
               Todavia no hay contratos cargados.
             </p>
           )}
@@ -858,19 +861,22 @@ export const AdminDashboard = ({
         {activeSection === "discounts" && (
           <section id="discounts" className="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">Solicitudes de descuento</h2>
-            <p className="text-sm text-slate-600">Aprueba o rechaza los casos enviados por inquilinos.</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Solicitudes de descuento</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Aprueba o rechaza los casos enviados por inquilinos.</p>
           </div>
           <div className="space-y-4">
             {discountsState.map((descuento) => (
-              <Card key={descuento.id} className="space-y-4 rounded-3xl border-slate-200 p-5 shadow-sm">
+              <Card
+                key={descuento.id}
+                className="space-y-4 rounded-3xl border-slate-200 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>
                     <CardTitle className="text-base">{formatCurrency(descuento.monto)}</CardTitle>
                     <CardDescription>
                       {descuento.motivo} - {descuento.contrato.direccion} - {descuento.contrato.inquilino?.nombre} {descuento.contrato.inquilino?.apellido}
                     </CardDescription>
-                    <p className="text-xs text-slate-400">Solicitado el {formatDate(descuento.createdAt)}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Solicitado el {formatDate(descuento.createdAt)}</p>
                   </div>
                   <StatusBadge status={descuento.estado} />
                 </div>
@@ -894,7 +900,7 @@ export const AdminDashboard = ({
               </Card>
             ))}
             {discountsState.length === 0 && (
-              <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">
+              <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 No hay solicitudes de descuento por ahora.
               </p>
             )}
@@ -904,15 +910,18 @@ export const AdminDashboard = ({
         {activeSection === "transfers" && (
           <section id="transfers" className="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">Transferencias pendientes</h2>
-            <p className="text-sm text-slate-600">Verifica comprobantes y deja comentarios si es necesario.</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Transferencias pendientes</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Verifica comprobantes y deja comentarios si es necesario.</p>
           </div>
           <div className="space-y-4">
             {transfers.map((item) => (
-              <Card key={item.id} className="space-y-4 rounded-3xl border-slate-200 p-5 shadow-sm">
+              <Card
+                key={item.id}
+                className="space-y-4 rounded-3xl border-slate-200 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{item.pago.contrato.direccion}</CardTitle>
-                  <span className="text-sm text-slate-500">Mes {item.pago.mes}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">Mes {item.pago.mes}</span>
                 </div>
                 <CardDescription>
                   Inquilino: {item.pago.contrato.inquilino?.nombre} {item.pago.contrato.inquilino?.apellido} - {formatCurrency(item.pago.monto)}
@@ -926,7 +935,7 @@ export const AdminDashboard = ({
                   >
                     Ver comprobante
                   </a>
-                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
+                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
                     {new Date(item.createdAt).toLocaleString("es-AR")}
                   </span>
                 </div>
@@ -946,7 +955,7 @@ export const AdminDashboard = ({
               </Card>
             ))}
             {transfers.length === 0 && (
-              <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">
+              <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 No hay transferencias pendientes.
               </p>
             )}
