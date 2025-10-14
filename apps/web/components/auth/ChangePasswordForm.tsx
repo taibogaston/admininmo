@@ -49,7 +49,8 @@ export const ChangePasswordForm = ({ email }: ChangePasswordFormProps) => {
       }
 
       toast.success("Contrasena actualizada");
-      router.replace("/dashboard");
+      // Forzar refresh completo para asegurar que los datos del servidor se actualicen
+      window.location.href = "/dashboard";
     } catch {
       toast.error("No se pudo conectar con el servidor");
     } finally {

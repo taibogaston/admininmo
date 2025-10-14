@@ -22,8 +22,18 @@ const formatDate = (value: string) => {
 
 export const OwnerDashboard = ({ contratos }: OwnerDashboardProps) => {
   const totalContratos = contratos.length;
-  const totalIngresos = contratos.reduce((acc, contrato) => acc + Number(contrato.montoMensual ?? 0), 0);
-  const totalComisiones = contratos.reduce((acc, contrato) => acc + Number(contrato.comisionMensual ?? 0), 0);
+  const totalIngresos = contratos.reduce((acc, contrato) => {
+    const montoTotal = Number(contrato.montoTotalAlquiler ?? 0);
+    const porcentajeComision = Number(contrato.porcentajeComisionInmobiliaria ?? 0);
+    const comisionInmobiliaria = (montoTotal * porcentajeComision) / 100;
+    return acc + (montoTotal - comisionInmobiliaria); // El propietario recibe el total menos la comisión
+  }, 0);
+  const totalComisiones = contratos.reduce((acc, contrato) => {
+    const montoTotal = Number(contrato.montoTotalAlquiler ?? 0);
+    const porcentajeComision = Number(contrato.porcentajeComisionInmobiliaria ?? 0);
+    const comisionInmobiliaria = (montoTotal * porcentajeComision) / 100;
+    return acc + comisionInmobiliaria;
+  }, 0);
 
   return (
     <div className="space-y-10">
@@ -76,12 +86,12 @@ export const OwnerDashboard = ({ contratos }: OwnerDashboardProps) => {
                 </div>
                 <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Monto mensual</p>
-                    <p className="font-medium text-slate-900">{formatCurrency(contrato.montoMensual)}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Monto total del alquiler</p>
+                    <p className="font-medium text-slate-900">{formatCurrency(contrato.montoTotalAlquiler)}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Comision</p>
-                    <p className="font-medium text-slate-900">{formatCurrency(contrato.comisionMensual)}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Comisión inmobiliaria</p>
+                    <p className="font-medium text-slate-900">{contrato.porcentajeComisionInmobiliaria}%</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-400">Inicio</p>

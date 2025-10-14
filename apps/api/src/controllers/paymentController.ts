@@ -1,5 +1,5 @@
 ﻿import { Request, Response } from "express";
-import { generatePago, createMercadoPagoPreference, registerTransferencia, processMercadoPagoWebhook, getPagoById } from "../services/paymentService";
+import { generatePago, registerTransferencia, processMercadoPagoWebhook, getPagoById, verificarTransferencia, ejecutarTransferenciasManuales, listTransferenciasPendientes, listTransferenciasInmobiliaria, calcularDivisionMontos } from "../services/paymentService";
 import { HttpError } from "../utils/errors";
 import { AuthTokenPayload } from "@admin-inmo/shared";
 
@@ -16,14 +16,13 @@ export const generatePagoController = async (req: AuthenticatedRequest, res: Res
 export const createPreferenceController = async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) throw new HttpError(401, "No autenticado");
   const { pagoId } = req.params;
-  const preference = await createMercadoPagoPreference(pagoId, req.user);
-  res.json(preference);
+  // TODO: Implementar createMercadoPagoPreference si es necesario
+  res.json({ message: "MercadoPago preference creation not implemented yet" });
 };
 
 export const registerTransferenciaController = async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) throw new HttpError(401, "No autenticado");
-  if (!req.file) throw new HttpError(400, "Archivo requerido");
-  const transferencia = await registerTransferencia(req.params.pagoId, req.user, req.file, req.body);
+  const transferencia = await registerTransferencia(req.params.pagoId, req.user, req.file || null, req.body);
   res.status(201).json(transferencia);
 };
 
@@ -34,6 +33,40 @@ export const getPagoController = async (req: AuthenticatedRequest, res: Response
 };
 
 export const mercadoPagoWebhookController = async (req: Request, res: Response) => {
-  await processMercadoPagoWebhook(req.body, req.get("x-signature"));
+  await processMercadoPagoWebhook(req.body);
   res.status(200).json({ received: true });
+};
+
+export const verificarTransferenciaController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  const { pagoId } = req.params;
+  const transferencia = await verificarTransferencia(pagoId, req.body, req.user);
+  res.json(transferencia);
+};
+
+export const ejecutarTransferenciasManualesController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  const { pagoId } = req.params;
+  const transferencia = await ejecutarTransferenciasManuales(pagoId, req.body, req.user);
+  res.json(transferencia);
+};
+
+export const listTransferenciasPendientesController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  const { inmobiliariaId } = req.params;
+  const transferencias = await listTransferenciasPendientes(inmobiliariaId, req.user);
+  res.json(transferencias);
+};
+
+export const listTransferenciasInmobiliariaController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  const transferencias = await listTransferenciasInmobiliaria(req.user);
+  res.json(transferencias);
+};
+
+export const getDivisionMontosController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  const { pagoId } = req.params;
+  const divisionMontos = await calcularDivisionMontos(pagoId);
+  res.json(divisionMontos);
 };

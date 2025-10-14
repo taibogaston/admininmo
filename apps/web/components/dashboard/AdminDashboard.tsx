@@ -12,10 +12,13 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/badge";
 import { clientApiFetch } from "@/lib/client-api";
-import { ADMIN_SECTIONS, AdminSection } from "./admin/sections";
+import { ADMIN_SECTIONS, AdminSection, getAdminSectionsForRole } from "./admin/sections";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { UserRole } from "@admin-inmo/shared";
+import { ConfiguracionPagosForm } from "./admin/ConfiguracionPagosForm";
+import { TransferenciasPendientesList } from "./admin/TransferenciasPendientesList";
+import { TransferenciasInmobiliariaList } from "./admin/TransferenciasInmobiliariaList";
 
 type UserOption = Pick<User, "id" | "nombre" | "apellido" | "email" | "rol" | "dni">;
 
@@ -24,11 +27,12 @@ interface AdminDashboardProps {
   transferencias: Transferencia[];
   descuentos: DescuentoDetalle[];
   activeSection: AdminSection;
+  userRole: UserRole;
 }
 
 interface ContractEditorState {
-  montoMensual: string;
-  comisionMensual: string;
+  montoTotalAlquiler: string;
+  porcentajeComisionInmobiliaria: string;
   diaVencimiento: string;
   fechaInicio: string;
   fechaFin: string;
@@ -91,6 +95,7 @@ export const AdminDashboard = ({
   transferencias,
   descuentos,
   activeSection,
+  userRole,
 }: AdminDashboardProps) => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [contracts, setContracts] = useState<Contrato[]>(contratos);
@@ -114,8 +119,8 @@ export const AdminDashboard = ({
     propietarioId: "",
     inquilinoId: "",
     direccion: "",
-    montoMensual: "",
-    comisionMensual: "0",
+    montoTotalAlquiler: "",
+    porcentajeComisionInmobiliaria: "0",
     diaVencimiento: "10",
     fechaInicio: "",
     fechaFin: "",
@@ -126,8 +131,8 @@ export const AdminDashboard = ({
   const [editorForms, setEditorForms] = useState<Record<string, ContractEditorState>>(() =>
     contratos.reduce<Record<string, ContractEditorState>>((acc, contrato) => {
       acc[contrato.id] = {
-        montoMensual: contrato.montoMensual ?? "",
-        comisionMensual: contrato.comisionMensual ?? "0",
+        montoTotalAlquiler: contrato.montoTotalAlquiler ?? "",
+        porcentajeComisionInmobiliaria: contrato.porcentajeComisionInmobiliaria ?? "0",
         diaVencimiento: String(contrato.diaVencimiento ?? 10),
         fechaInicio: contrato.fechaInicio?.slice(0, 10) ?? "",
         fechaFin: contrato.fechaFin?.slice(0, 10) ?? "",
@@ -142,7 +147,7 @@ export const AdminDashboard = ({
     contratos.reduce<Record<string, AjusteState>>((acc, contrato) => {
       acc[contrato.id] = {
         metodo: "ICL",
-        montoBase: contrato.montoMensual ?? "0",
+        montoBase: contrato.montoTotalAlquiler ?? "0",
         meses: String(contrato.ajusteFrecuenciaMeses ?? 12),
         tasaMensual: "0.02",
         indices: "",
@@ -158,8 +163,8 @@ export const AdminDashboard = ({
       contracts.forEach((contrato) => {
         const previous = prev[contrato.id];
         next[contrato.id] = {
-          montoMensual: previous?.montoMensual ?? contrato.montoMensual ?? "",
-          comisionMensual: previous?.comisionMensual ?? contrato.comisionMensual ?? "0",
+          montoTotalAlquiler: previous?.montoTotalAlquiler ?? contrato.montoTotalAlquiler ?? "",
+          porcentajeComisionInmobiliaria: previous?.porcentajeComisionInmobiliaria ?? contrato.porcentajeComisionInmobiliaria ?? "0",
           diaVencimiento: previous?.diaVencimiento ?? String(contrato.diaVencimiento ?? 10),
           fechaInicio: previous?.fechaInicio ?? contrato.fechaInicio?.slice(0, 10) ?? "",
           fechaFin: previous?.fechaFin ?? contrato.fechaFin?.slice(0, 10) ?? "",
@@ -177,7 +182,7 @@ export const AdminDashboard = ({
       contracts.forEach((contrato) => {
         next[contrato.id] = prev[contrato.id] ?? {
           metodo: "ICL",
-          montoBase: contrato.montoMensual ?? "0",
+          montoBase: contrato.montoTotalAlquiler ?? "0",
           meses: String(contrato.ajusteFrecuenciaMeses ?? 12),
           tasaMensual: "0.02",
           indices: "",
@@ -223,14 +228,16 @@ export const AdminDashboard = ({
     document.body.style.overflow = originalOverflow;
   }, [mobileNavOpen]);
 
+  const userSections = useMemo(() => getAdminSectionsForRole(userRole), [userRole]);
+  
   const activeSectionConfig = useMemo(
-    () => ADMIN_SECTIONS.find((section) => section.id === activeSection) ?? ADMIN_SECTIONS[0],
-    [activeSection]
+    () => userSections.find((section) => section.id === activeSection) ?? userSections[0],
+    [activeSection, userSections]
   );
 
   const NavigationItems = ({ onNavigate }: { onNavigate?: () => void }) => (
     <ul className="space-y-1.5">
-      {ADMIN_SECTIONS.map((section) => {
+      {userSections.map((section) => {
         const isActive = section.id === activeSection;
         const Icon = section.icon;
         return (
@@ -375,8 +382,8 @@ export const AdminDashboard = ({
           propietarioId: createForm.propietarioId,
           inquilinoId: createForm.inquilinoId,
           direccion: createForm.direccion,
-          montoMensual: Number(createForm.montoMensual),
-          comisionMensual: Number(createForm.comisionMensual || 0),
+          montoTotalAlquiler: Number(createForm.montoTotalAlquiler),
+          porcentajeComisionInmobiliaria: Number(createForm.porcentajeComisionInmobiliaria || 0),
           diaVencimiento: Number(createForm.diaVencimiento),
           fechaInicio: createForm.fechaInicio,
           fechaFin: createForm.fechaFin,
@@ -390,8 +397,8 @@ export const AdminDashboard = ({
         propietarioId: "",
         inquilinoId: "",
         direccion: "",
-        montoMensual: "",
-        comisionMensual: "0",
+        montoTotalAlquiler: "",
+        porcentajeComisionInmobiliaria: "0",
         diaVencimiento: "10",
         fechaInicio: "",
         fechaFin: "",
@@ -414,8 +421,8 @@ export const AdminDashboard = ({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          montoMensual: Number(form.montoMensual),
-          comisionMensual: Number(form.comisionMensual || 0),
+          montoTotalAlquiler: Number(form.montoTotalAlquiler),
+          porcentajeComisionInmobiliaria: Number(form.porcentajeComisionInmobiliaria || 0),
           diaVencimiento: Number(form.diaVencimiento || 1),
           fechaInicio: form.fechaInicio,
           fechaFin: form.fechaFin,
@@ -492,7 +499,7 @@ export const AdminDashboard = ({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          montoMensual: ajuste.resultado,
+          montoTotalAlquiler: ajuste.resultado,
           fechaUltimoAjuste: new Date().toISOString(),
         }),
       });
@@ -500,8 +507,8 @@ export const AdminDashboard = ({
       setEditorForms((prev) => ({
         ...prev,
         [contratoId]: {
-          montoMensual: updated.montoMensual ?? "",
-          comisionMensual: updated.comisionMensual ?? "0",
+          montoTotalAlquiler: updated.montoTotalAlquiler ?? "",
+          porcentajeComisionInmobiliaria: updated.porcentajeComisionInmobiliaria ?? "0",
           diaVencimiento: String(updated.diaVencimiento ?? 10),
           fechaInicio: updated.fechaInicio?.slice(0, 10) ?? "",
           fechaFin: updated.fechaFin?.slice(0, 10) ?? "",
@@ -513,7 +520,7 @@ export const AdminDashboard = ({
         ...prev,
         [contratoId]: {
           metodo: ajuste.metodo,
-          montoBase: updated.montoMensual ?? "0",
+          montoBase: updated.montoTotalAlquiler ?? "0",
           meses: ajuste.meses,
           tasaMensual: ajuste.tasaMensual,
           indices: ajuste.indices,
@@ -803,26 +810,27 @@ export const AdminDashboard = ({
               {/* Sección 3: Monto y Comisión */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor="monto">Monto mensual</Label>
+                  <Label htmlFor="monto">Monto total del alquiler</Label>
                   <Input
                     id="monto"
                     type="number"
                     min={0}
                     step="0.01"
-                    value={createForm.montoMensual}
-                    onChange={(event) => setCreateForm((prev) => ({ ...prev, montoMensual: event.target.value }))}
+                    value={createForm.montoTotalAlquiler}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, montoTotalAlquiler: event.target.value }))}
                     required
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="comision">Comision</Label>
+                  <Label htmlFor="comision">Comisión inmobiliaria (%)</Label>
                   <Input
                     id="comision"
                     type="number"
                     min={0}
-                    step="0.01"
-                    value={createForm.comisionMensual}
-                    onChange={(event) => setCreateForm((prev) => ({ ...prev, comisionMensual: event.target.value }))}
+                    max={100}
+                    step="0.1"
+                    value={createForm.porcentajeComisionInmobiliaria}
+                    onChange={(event) => setCreateForm((prev) => ({ ...prev, porcentajeComisionInmobiliaria: event.target.value }))}
                     placeholder="0"
                   />
                 </div>
@@ -943,8 +951,8 @@ export const AdminDashboard = ({
           <div className="grid gap-4 lg:grid-cols-2">
             {contratosOrdenados.map((contrato) => {
               const editor = editorForms[contrato.id] ?? {
-                montoMensual: contrato.montoMensual ?? "",
-                comisionMensual: contrato.comisionMensual ?? "0",
+                montoTotalAlquiler: contrato.montoTotalAlquiler ?? "",
+                porcentajeComisionInmobiliaria: contrato.porcentajeComisionInmobiliaria ?? "0",
                 diaVencimiento: String(contrato.diaVencimiento ?? 10),
                 fechaInicio: contrato.fechaInicio?.slice(0, 10) ?? "",
                 fechaFin: contrato.fechaFin?.slice(0, 10) ?? "",
@@ -953,7 +961,7 @@ export const AdminDashboard = ({
               };
               const ajuste = ajusteForms[contrato.id] ?? {
                 metodo: "ICL",
-                montoBase: contrato.montoMensual ?? "0",
+                montoBase: contrato.montoTotalAlquiler ?? "0",
                 meses: String(contrato.ajusteFrecuenciaMeses ?? 12),
                 tasaMensual: "0.02",
                 indices: "",
@@ -988,12 +996,12 @@ export const AdminDashboard = ({
 
                   <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Monto mensual</p>
-                      <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(contrato.montoMensual)}</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Monto total del alquiler</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(contrato.montoTotalAlquiler)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Comision</p>
-                      <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(contrato.comisionMensual)}</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Comisión inmobiliaria</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{contrato.porcentajeComisionInmobiliaria}%</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Vencimiento</p>
@@ -1025,29 +1033,31 @@ export const AdminDashboard = ({
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">Editar datos principales</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <Label>Monto mensual</Label>
+                        <Label>Monto total del alquiler</Label>
                         <Input
                           type="number"
                           min={0}
-                          value={editor.montoMensual}
+                          value={editor.montoTotalAlquiler}
                           onChange={(event) =>
                             setEditorForms((prev) => ({
                               ...prev,
-                              [contrato.id]: { ...editor, montoMensual: event.target.value },
+                              [contrato.id]: { ...editor, montoTotalAlquiler: event.target.value },
                             }))
                           }
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label>Comision</Label>
+                        <Label>Comisión inmobiliaria (%)</Label>
                         <Input
                           type="number"
                           min={0}
-                          value={editor.comisionMensual}
+                          max={100}
+                          step="0.1"
+                          value={editor.porcentajeComisionInmobiliaria}
                           onChange={(event) =>
                             setEditorForms((prev) => ({
                               ...prev,
-                              [contrato.id]: { ...editor, comisionMensual: event.target.value },
+                              [contrato.id]: { ...editor, porcentajeComisionInmobiliaria: event.target.value },
                             }))
                           }
                         />
@@ -1279,58 +1289,26 @@ export const AdminDashboard = ({
         )}
         {activeSection === "transfers" && (
           <section id="transfers" className="space-y-6">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Transferencias pendientes</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Verifica comprobantes y deja comentarios si es necesario.</p>
-          </div>
-          <div className="space-y-4">
-            {transfers.map((item) => (
-              <Card
-                key={item.id}
-                className="space-y-4 rounded-3xl border-slate-200 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-              >
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{item.pago.contrato.direccion}</CardTitle>
-                  <span className="text-sm text-slate-500 dark:text-slate-400">Mes {item.pago.mes}</span>
-                </div>
-                <CardDescription>
-                  Inquilino: {item.pago.contrato.inquilino?.nombre} {item.pago.contrato.inquilino?.apellido} - {formatCurrency(item.pago.monto)}
-                </CardDescription>
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    className="text-sm font-medium text-primary hover:underline"
-                    href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/api/transferencias/${item.id}/comprobante`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Ver comprobante
-                  </a>
-                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                    {new Date(item.createdAt).toLocaleString("es-AR")}
-                  </span>
-                </div>
-                <Textarea
-                  placeholder="Comentario opcional"
-                  value={comentariosTransferencia[item.id] ?? ""}
-                  onChange={(event) =>
-                    setComentariosTransferencia((prev) => ({ ...prev, [item.id]: event.target.value }))
-                  }
-                />
-                <div className="flex gap-2">
-                  <Button onClick={() => handleVerificarTransferencia(item.id, true)}>Aprobar</Button>
-                  <Button variant="outline" onClick={() => handleVerificarTransferencia(item.id, false)}>
-                    Rechazar
-                  </Button>
-                </div>
-              </Card>
-            ))}
-            {transfers.length === 0 && (
-              <p className="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                No hay transferencias pendientes.
-              </p>
+            {userRole === UserRole.SUPER_ADMIN ? (
+              <TransferenciasPendientesList inmobiliariaId={contratos[0]?.inmobiliariaId || ""} />
+            ) : (
+              <TransferenciasInmobiliariaList transferencias={transferencias} />
             )}
-          </div>
-        </section>
+          </section>
+        )}
+        {activeSection === "configuracion-pagos" && (
+          <section id="configuracion-pagos" className="space-y-6">
+            {userRole === UserRole.SUPER_ADMIN ? (
+              <>
+                <ConfiguracionPagosForm inmobiliariaId={contratos[0]?.inmobiliariaId || ""} />
+                <div className="mt-8">
+                  <TransferenciasPendientesList inmobiliariaId={contratos[0]?.inmobiliariaId || ""} />
+                </div>
+              </>
+            ) : (
+              <ConfiguracionPagosForm inmobiliariaId={contratos[0]?.inmobiliariaId || ""} readonly={true} />
+            )}
+          </section>
         )}
       </main>
     </div>

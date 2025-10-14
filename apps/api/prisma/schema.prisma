@@ -36,7 +36,8 @@ enum MovimientoTipo {
 }
 
 enum TransferenciaEstado {
-  PENDIENTE
+  PENDIENTE_VERIFICACION
+  VERIFICADO
   APROBADO
   RECHAZADO
 }
@@ -80,8 +81,8 @@ model Contrato {
   inquilino      User              @relation("InquilinoContratos", fields: [inquilinoId], references: [id])
   inquilinoId    String
   direccion      String
-  montoMensual   Decimal           @db.Decimal(12, 2)
-  comisionMensual Decimal          @db.Decimal(12, 2) @default(0)
+  montoTotalAlquiler Decimal       @db.Decimal(12, 2) // Monto total que paga el inquilino
+  porcentajeComisionInmobiliaria Decimal @db.Decimal(5, 2) @default(0) // Porcentaje de comisión para la inmobiliaria (0-100)
   diaVencimiento Int               @default(10)
   fechaInicio    DateTime
   fechaFin       DateTime
@@ -125,6 +126,7 @@ model Pago {
   metodoPago    PagoMetodo?
   mpPreferenceId String?
   mpPaymentId    String?
+  externalId    String         @unique // ID único para idempotencia (ej: ALQ-202510-<id>)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   movimiento    Movimiento?
@@ -133,6 +135,7 @@ model Pago {
   @@unique([contratoId, mes])
   @@index([contratoId])
   @@index([estado])
+  @@index([externalId])
 }
 
 model Movimiento {
@@ -154,12 +157,15 @@ model Transferencia {
   id               String              @id @default(cuid())
   pago             Pago                @relation(fields: [pagoId], references: [id])
   pagoId           String              @unique
-  comprobantePath  String
-  verificado       TransferenciaEstado @default(PENDIENTE)
+  comprobantePath  String?             // Solo la imagen del comprobante
+  verificado       TransferenciaEstado @default(PENDIENTE_VERIFICACION)
   verificadoPor    User?               @relation("VerificadorTransferencias", fields: [verificadoPorId], references: [id])
   verificadoPorId  String?
   verificadoAt     DateTime?
   comentario       String?
+  // IDs de transferencias ejecutadas por super admin
+  transferenciaPropietarioId String?
+  transferenciaInmobiliariaId String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
@@ -183,11 +189,46 @@ model Descuento {
 }
 
 model Inmobiliaria {
-  id        String    @id @default(cuid())
-  nombre    String
-  slug      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  usuarios  User[]
-  contratos Contrato[]
+  id                String    @id @default(cuid())
+  nombre            String
+  slug              String    @unique
+  porcentajeComision Decimal  @default(3.0) @db.Decimal(5, 2) // Porcentaje de comisión (ej: 3.00 para 3%)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  usuarios          User[]
+  contratos         Contrato[]
+  configuracionPagos ConfiguracionPagos?
+}
+
+model ConfiguracionPagos {
+  id               String      @id @default(cuid())
+  inmobiliaria     Inmobiliaria @relation(fields: [inmobiliariaId], references: [id])
+  inmobiliariaId   String      @unique
+  cbuDestino       String
+  aliasCbu         String?
+  banco            String?
+  qrCode           String?     // Base64 del QR o URL
+  activo           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Notificacion {
+  id           String    @id @default(cuid())
+  tipo         String    // PAGO_APROBADO, PAGO_RECHAZADO, TRANSFERENCIA_VERIFICADA, etc.
+  titulo       String
+  mensaje      String
+  userId       String?   // Si es específica para un usuario
+  inmobiliariaId String? // Si es para todos los usuarios de una inmobiliaria
+  pagoId       String?   // Si está relacionada con un pago específico
+  leida        Boolean   @default(false)
+  enviada      Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([inmobiliariaId])
+  @@index([pagoId])
+  @@index([leida])
+  @@index([enviada])
 }

@@ -42,7 +42,7 @@ export default async function SuperAdminLayout({ children }: SuperAdminLayoutPro
           </div>
         </div>
       </header>
-      <main className="px-4 pb-12 pt-24 md:px-8">{children}</main>
+      <main className="pt-20">{children}</main>
     </div>
   );
 }

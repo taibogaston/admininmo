@@ -8,7 +8,8 @@ export const LogoutButton = () => {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    // Forzar refresh completo para asegurar que se limpie el estado
+    window.location.href = "/login";
   };
 
   return (

@@ -42,11 +42,12 @@ export default function LoginPage() {
       }
       if (data?.user?.mustChangePassword) {
         toast.success("Sesion iniciada. Debes actualizar la contrasena.");
-        router.replace("/change-password");
+        window.location.href = "/change-password";
         return;
       }
       toast.success("Sesion iniciada");
-      router.replace("/dashboard");
+      // Forzar refresh completo para asegurar que los datos del servidor se actualicen
+      window.location.href = "/dashboard";
     } catch {
       toast.error("No se pudo conectar con el servidor");
     }

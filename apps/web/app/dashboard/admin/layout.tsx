@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     redirect("/login");
   }
 
-  if (user.rol !== UserRole.ADMIN) {
+  if (user.rol !== UserRole.ADMIN && user.rol !== UserRole.SUPER_ADMIN) {
     redirect("/dashboard");
   }
 

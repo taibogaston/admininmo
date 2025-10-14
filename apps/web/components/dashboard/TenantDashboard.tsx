@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/lib/toast";
+import { ConfiguracionPagosInquilino } from "./ConfiguracionPagosInquilino";
 
 interface TenantDashboardProps {
   contratos: Contrato[];
@@ -44,6 +45,7 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const [descuentosLoading, setDescuentosLoading] = useState(false);
   const [transferFile, setTransferFile] = useState<File | null>(null);
   const [comentarioTransferencia, setComentarioTransferencia] = useState("");
+  // Campos removidos: solo necesitamos imagen + externalId del pago
   const [descuentoMonto, setDescuentoMonto] = useState("");
   const [descuentoMotivo, setDescuentoMotivo] = useState("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
@@ -86,10 +88,33 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const pendingPago = useMemo(() => {
     const pendientes = pagos.filter((p) => p.estado === "PENDIENTE");
     if (pendientes.length === 0) {
+      // Si no hay pagos pendientes pero hay contrato activo, crear un pago virtual para mostrar la funcionalidad
+      if (contrato) {
+        const today = new Date();
+        const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        
+        // Verificar si ya existe un pago para este mes
+        const existingPago = pagos.find(p => p.mes === currentMonth);
+        if (!existingPago) {
+          // Crear un pago virtual para mostrar la funcionalidad
+          // Usar un externalId fijo basado en el contrato y mes para evitar problemas de hidratación
+          const virtualExternalId = `ALQ-${currentMonth.replace('-', '')}-${contrato.id.slice(-8)}`;
+          return {
+            id: `virtual-${currentMonth}`,
+            contratoId: contrato.id,
+            mes: currentMonth,
+            monto: contrato.montoTotalAlquiler.toString(),
+            estado: "PENDIENTE" as const,
+            fechaPago: null,
+            metodoPago: null,
+            externalId: virtualExternalId
+          };
+        }
+      }
       return null;
     }
     return pendientes.reduce((menor, actual) => (comparePeriod(actual.mes, menor.mes) < 0 ? actual : menor));
-  }, [pagos]);
+  }, [pagos, contrato]);
 
   const dueDate = useMemo(() => {
     if (!contrato) return null;
@@ -129,16 +154,35 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
             ? "Hoy"
             : `Hace ${Math.abs(daysUntilDue)} dias`;
 
-  const montoBase = pendingPago ? Number(pendingPago.monto) : Number(contrato?.montoMensual ?? 0);
-  const comision = Number(contrato?.comisionMensual ?? 0);
-  const totalAPagar = montoBase + comision;
+  const montoBase = pendingPago ? Number(pendingPago.monto) : Number(contrato?.montoTotalAlquiler ?? 0);
+  const comisionInmobiliaria = Number(contrato?.porcentajeComisionInmobiliaria ?? 0);
+  const totalAPagar = montoBase; // El inquilino solo ve el monto total del alquiler
 
   const siguienteMonto = formatCurrency(totalAPagar);
 
   const handleMercadoPago = async () => {
     if (!pendingPago) return;
     try {
-      const preference = await clientApiFetch<{ init_point: string }>(`/api/pagos/${pendingPago.id}/mp/preference`, {
+      let pagoId = pendingPago.id;
+      
+      // Si es un pago virtual, primero generamos el pago real
+      if (pendingPago.id.startsWith('virtual-')) {
+        const generateResponse = await clientApiFetch<Pago>(`/api/pagos/generar`, {
+          method: "POST",
+          body: JSON.stringify({
+            contratoId: pendingPago.contratoId,
+            mes: pendingPago.mes,
+            monto: Number(pendingPago.monto)
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        pagoId = generateResponse.id;
+        await recargarPagos(pendingPago.contratoId);
+      }
+
+      const preference = await clientApiFetch<{ init_point: string }>(`/api/pagos/${pagoId}/mp/preference`, {
         method: "POST",
       });
       window.location.href = preference.init_point;
@@ -176,21 +220,43 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
 
   const handleTransferSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!pendingPago || !transferFile) {
-      toast.error("Selecciona un comprobante antes de enviar");
+    if (!pendingPago) {
+      toast.error("No hay pago pendiente");
       return;
     }
     setTransferSubmitting(true);
 
-    const formData = new FormData();
-    formData.append("comprobante", transferFile);
-    if (comentarioTransferencia) {
-      formData.append("comentario", comentarioTransferencia);
-    }
-
     try {
+      let pagoId = pendingPago.id;
+      
+      // Si es un pago virtual, primero generamos el pago real
+      if (pendingPago.id.startsWith('virtual-')) {
+        const generateResponse = await clientApiFetch<Pago>(`/api/pagos/generar`, {
+          method: "POST",
+          body: JSON.stringify({
+            contratoId: pendingPago.contratoId,
+            mes: pendingPago.mes,
+            monto: Number(pendingPago.monto)
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        pagoId = generateResponse.id;
+        toast.success("Pago generado correctamente");
+      }
+
+      const formData = new FormData();
+      if (transferFile) {
+        formData.append("comprobante", transferFile);
+      }
+      if (comentarioTransferencia) {
+        formData.append("comentario", comentarioTransferencia);
+      }
+      // Solo enviamos la imagen del comprobante + externalId del pago
+
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-      const response = await fetch(`${baseUrl}/api/pagos/${pendingPago.id}/transferencia`, {
+      const response = await fetch(`${baseUrl}/api/pagos/${pagoId}/transferencia`, {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -199,7 +265,7 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
         const text = await response.text();
         throw new Error(text || "No se pudo enviar el comprobante");
       }
-      toast.success("Comprobante enviado para validacion");
+      toast.success("Comprobante enviado para validación");
       setTransferFile(null);
       setComentarioTransferencia("");
       await recargarPagos(pendingPago.contratoId);
@@ -298,12 +364,12 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
             <dd className="text-sm font-medium text-white">{daysLabel}</dd>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <dt className="text-xs uppercase tracking-wide text-slate-300">Total a pagar (alquiler + comision)</dt>
+            <dt className="text-xs uppercase tracking-wide text-slate-300">Total a pagar</dt>
             <dd className="text-sm font-medium text-white">{siguienteMonto}</dd>
           </div>
         </dl>
         <p className="mt-4 text-xs text-slate-300 sm:text-sm">
-          Incluye {formatCurrency(contrato.montoMensual ?? 0)} de alquiler y {formatCurrency(comision)} de comision.
+          Monto total del alquiler: {formatCurrency(contrato.montoTotalAlquiler ?? 0)}.
         </p>
       </section>
 
@@ -343,13 +409,15 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
           )}
 
           {pendingPago && (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-900">Completar el pago de {pendingPago.mes}</p>
-              <p className="mb-4 text-xs text-slate-500">
-                Total a pagar: {formatCurrency(totalAPagar)} (alquiler {formatCurrency(montoBase)} + comision{" "}
-                {formatCurrency(comision)}). Elegi el metodo que prefieras y, si usas transferencia, sube el comprobante
-                para validarlo.
-              </p>
+            <div className="mt-6 space-y-6">
+              <ConfiguracionPagosInquilino inmobiliariaId={contratos.find(c => c.id === selectedContratoId)?.inmobiliariaId || ""} />
+              
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-900">Completar el pago de {pendingPago.mes}</p>
+                <p className="mb-4 text-xs text-slate-500">
+                  Total a pagar: {formatCurrency(totalAPagar)}. Elegi el metodo que prefieras y, si usas transferencia, sube el comprobante
+                  para validarlo.
+                </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button onClick={handleMercadoPago} className="sm:w-auto">
                   Pagar con Mercado Pago
@@ -359,7 +427,7 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
               <form onSubmit={handleTransferSubmit} className="mt-4 grid gap-3" encType="multipart/form-data">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <Label htmlFor="transfer-file">Comprobante</Label>
+                    <Label htmlFor="transfer-file">Comprobante (opcional)</Label>
                     <Input
                       id="transfer-file"
                       type="file"
@@ -367,20 +435,29 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
                       onChange={(event) => setTransferFile(event.target.files?.[0] ?? null)}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="transfer-comment">Comentario (opcional)</Label>
-                    <Input
-                      id="transfer-comment"
-                      value={comentarioTransferencia}
-                      onChange={(event) => setComentarioTransferencia(event.target.value)}
-                      placeholder="Ej. Banco y referencia"
-                    />
+                  <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <strong>ID de Referencia:</strong> {pendingPago.externalId}
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                      Usa este ID como referencia en tu transferencia para que el administrador pueda verificar el pago.
+                    </p>
                   </div>
                 </div>
-                <Button type="submit" variant="outline" disabled={!transferFile || transferSubmitting}>
-                  {transferSubmitting ? "Enviando..." : "Enviar comprobante"}
+                <div className="space-y-1">
+                  <Label htmlFor="transfer-comment">Comentario adicional (opcional)</Label>
+                  <Input
+                    id="transfer-comment"
+                    value={comentarioTransferencia}
+                    onChange={(event) => setComentarioTransferencia(event.target.value)}
+                    placeholder="Ej. Banco y referencia"
+                  />
+                </div>
+                <Button type="submit" variant="outline" disabled={transferSubmitting}>
+                  {transferSubmitting ? "Enviando..." : "Enviar datos de transferencia"}
                 </Button>
               </form>
+              </div>
             </div>
           )}
         </Card>

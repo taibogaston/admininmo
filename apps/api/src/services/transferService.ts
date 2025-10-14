@@ -15,10 +15,10 @@ export const listTransferenciasPendientes = async (actor: AuthTokenPayload) => {
   const where =
     actor.role === UserRole.ADMIN && actor.inmobiliariaId
       ? {
-          verificado: TransferenciaEstado.PENDIENTE,
+          verificado: TransferenciaEstado.PENDIENTE_VERIFICACION,
           pago: { contrato: { inmobiliariaId: actor.inmobiliariaId } },
         }
-      : { verificado: TransferenciaEstado.PENDIENTE };
+      : { verificado: TransferenciaEstado.PENDIENTE_VERIFICACION };
 
   return prisma.transferencia.findMany({
     where,
@@ -121,7 +121,7 @@ export const getTransferenciaFile = async (id: string, actor: AuthTokenPayload) 
     throw new HttpError(403, "No tienes acceso a esta transferencia");
   }
 
-  if (!fs.existsSync(transferencia.comprobantePath)) {
+  if (transferencia.comprobantePath && !fs.existsSync(transferencia.comprobantePath)) {
     throw new HttpError(404, "Archivo no encontrado");
   }
 

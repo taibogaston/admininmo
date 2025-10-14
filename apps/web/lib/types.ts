@@ -38,6 +38,7 @@ export interface Pago {
   estado: PagoEstado;
   fechaPago?: string;
   metodoPago?: PagoMetodo;
+  externalId: string;
 }
 
 export interface Movimiento {
@@ -64,8 +65,8 @@ export interface Contrato {
   id: string;
   inmobiliariaId: string;
   direccion: string;
-  montoMensual: string;
-  comisionMensual: string;
+  montoTotalAlquiler: string; // Monto total que paga el inquilino
+  porcentajeComisionInmobiliaria: string; // Porcentaje de comisión para la inmobiliaria (0-100)
   diaVencimiento: number;
   fechaInicio: string;
   fechaFin: string;
@@ -83,16 +84,22 @@ export interface Contrato {
 export interface Transferencia {
   id: string;
   pagoId: string;
-  comprobantePath: string;
+  comprobantePath?: string;
   verificado: TransferenciaEstado;
+  verificadoPorId?: string;
+  verificadoAt?: string;
   comentario?: string;
+  transferenciaPropietarioId?: string;
+  transferenciaInmobiliariaId?: string;
   pago: Pago & {
     contrato: Contrato & {
+      inmobiliaria: InmobiliariaSummary;
       propietario: User;
       inquilino: User;
     };
   };
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface DescuentoDetalle extends Descuento {
@@ -109,5 +116,35 @@ export interface InmobiliariaWithCounts extends InmobiliariaSummary {
   contratos: number;
 }
 
+export interface ConfiguracionPagos {
+  id: string;
+  inmobiliariaId: string;
+  cbuDestino: string;
+  aliasCbu?: string;
+  banco?: string;
+  qrCode?: string;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
-
+export interface TransferenciaManual {
+  id: string;
+  pagoId: string;
+  comprobantePath?: string;
+  verificado: TransferenciaEstado;
+  verificadoPorId?: string;
+  verificadoAt?: string;
+  comentario?: string;
+  transferenciaPropietarioId?: string;
+  transferenciaInmobiliariaId?: string;
+  pago: Pago & {
+    contrato: Contrato & {
+      inmobiliaria: InmobiliariaSummary;
+      propietario: User;
+      inquilino: User;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
+}

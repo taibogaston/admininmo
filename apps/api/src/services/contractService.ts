@@ -10,8 +10,8 @@ const contractInputSchema = z.object({
   propietarioId: z.string().min(1),
   inquilinoId: z.string().min(1),
   direccion: z.string().min(1),
-  montoMensual: z.number().positive(),
-  comisionMensual: z.number().min(0).default(0),
+  montoTotalAlquiler: z.number().positive(), // Monto total que paga el inquilino
+  porcentajeComisionInmobiliaria: z.number().min(0).max(100).default(0), // Porcentaje de comisión para la inmobiliaria (0-100)
   diaVencimiento: z.number().int().min(1).max(31).default(10),
   fechaInicio: z.coerce.date(),
   fechaFin: z.coerce.date(),
@@ -131,8 +131,8 @@ export const createContract = async (data: unknown, actor: AuthTokenPayload) => 
       propietarioId: parsed.propietarioId,
       inquilinoId: parsed.inquilinoId,
       direccion: parsed.direccion,
-      montoMensual: new Prisma.Decimal(parsed.montoMensual),
-      comisionMensual: new Prisma.Decimal(parsed.comisionMensual),
+      montoTotalAlquiler: new Prisma.Decimal(parsed.montoTotalAlquiler),
+      porcentajeComisionInmobiliaria: new Prisma.Decimal(parsed.porcentajeComisionInmobiliaria),
       diaVencimiento: parsed.diaVencimiento,
       fechaInicio: parsed.fechaInicio,
       fechaFin: parsed.fechaFin,
@@ -193,11 +193,11 @@ export const updateContract = async (contratoId: string, data: unknown, actor: A
     dataToUpdate.inquilino = { connect: { id: parsed.inquilinoId } };
   }
   if (parsed.direccion !== undefined) dataToUpdate.direccion = parsed.direccion;
-  if (parsed.montoMensual !== undefined) {
-    dataToUpdate.montoMensual = new Prisma.Decimal(parsed.montoMensual);
+  if (parsed.montoTotalAlquiler !== undefined) {
+    dataToUpdate.montoTotalAlquiler = new Prisma.Decimal(parsed.montoTotalAlquiler);
   }
-  if (parsed.comisionMensual !== undefined) {
-    dataToUpdate.comisionMensual = new Prisma.Decimal(parsed.comisionMensual);
+  if (parsed.porcentajeComisionInmobiliaria !== undefined) {
+    dataToUpdate.porcentajeComisionInmobiliaria = new Prisma.Decimal(parsed.porcentajeComisionInmobiliaria);
   }
   if (parsed.diaVencimiento !== undefined) dataToUpdate.diaVencimiento = parsed.diaVencimiento;
   if (parsed.fechaInicio !== undefined) dataToUpdate.fechaInicio = parsed.fechaInicio;

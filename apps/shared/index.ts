@@ -27,7 +27,8 @@ export enum MovimientoTipo {
 }
 
 export enum TransferenciaEstado {
-  PENDIENTE = "PENDIENTE",
+  PENDIENTE_VERIFICACION = "PENDIENTE_VERIFICACION",
+  VERIFICADO = "VERIFICADO",
   APROBADO = "APROBADO",
   RECHAZADO = "RECHAZADO",
 }
@@ -70,6 +71,53 @@ export interface InmobiliariaSummary {
   id: string;
   nombre: string;
   slug: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConfiguracionPagos {
+  id: string;
+  inmobiliariaId: string;
+  cbuDestino: string;
+  aliasCbu?: string;
+  banco?: string;
+  qrCode?: string;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConfiguracionPagosPublica {
+  cbuDestino: string;
+  aliasCbu?: string;
+  banco?: string;
+  qrCode?: string;
+}
+
+export interface TransferenciaManual {
+  id: string;
+  pagoId: string;
+  comprobantePath?: string;
+  verificado: TransferenciaEstado;
+  verificadoPorId?: string;
+  verificadoAt?: string;
+  comentario?: string;
+  transferenciaPropietarioId?: string;
+  transferenciaInmobiliariaId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notificacion {
+  id: string;
+  tipo: string;
+  titulo: string;
+  mensaje: string;
+  userId?: string;
+  inmobiliariaId?: string;
+  pagoId?: string;
+  leida: boolean;
+  enviada: boolean;
   createdAt: string;
   updatedAt: string;
 }

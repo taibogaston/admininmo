@@ -5,7 +5,7 @@ export async function fetchAdminDashboardData() {
   const [contratos, descuentos, transferencias] = await Promise.all([
     serverApiFetch<Contrato[]>("/api/contratos"),
     serverApiFetch<DescuentoDetalle[]>("/api/descuentos"),
-    serverApiFetch<Transferencia[]>("/api/transferencias/pendientes"),
+    serverApiFetch<Transferencia[]>("/api/pagos/transferencias-inmobiliaria"), // Changed to new endpoint
   ]);
 
   return { contratos, descuentos, transferencias };
