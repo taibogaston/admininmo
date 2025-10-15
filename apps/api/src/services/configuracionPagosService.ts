@@ -12,7 +12,11 @@ const configuracionSchema = z.object({
   banco: z.string().max(100).optional(),
   qrCode: z.string().optional(),
   activo: z.boolean().default(true),
-  porcentajeComision: z.number().min(0).max(100).default(3.0),
+  porcentajeComision: z.union([z.number(), z.string()]).transform((val) => {
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return 3.0;
+    return Math.max(0, Math.min(100, num));
+  }).default(3.0),
 });
 
 type ConfiguracionInput = z.infer<typeof configuracionSchema>;

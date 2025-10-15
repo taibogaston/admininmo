@@ -16,9 +16,15 @@ export const getConfiguracionPagosController = async (req: AuthenticatedRequest,
 
 export const createOrUpdateConfiguracionPagosController = async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) throw new HttpError(401, "No autenticado");
-  const { inmobiliariaId } = req.params;
-  const configuracion = await createOrUpdateConfiguracionPagos(inmobiliariaId, req.body, req.user);
-  res.json(configuracion);
+  
+  try {
+    const { inmobiliariaId } = req.params;
+    const configuracion = await createOrUpdateConfiguracionPagos(inmobiliariaId, req.body, req.user);
+    res.json(configuracion);
+  } catch (error) {
+    console.error("Error en createOrUpdateConfiguracionPagosController:", error);
+    throw error;
+  }
 };
 
 export const getConfiguracionPagosPublicaController = async (req: Request, res: Response) => {

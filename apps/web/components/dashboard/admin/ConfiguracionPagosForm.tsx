@@ -198,7 +198,11 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                   min="0"
                   max="100"
                   value={formData.porcentajeComision}
-                  onChange={(e) => handleInputChange("porcentajeComision", parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const numValue = value === '' ? 0 : parseFloat(value);
+                    handleInputChange("porcentajeComision", isNaN(numValue) ? 0 : numValue);
+                  }}
                   placeholder="3.0"
                   readOnly={readonly}
                 />

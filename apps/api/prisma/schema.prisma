@@ -48,6 +48,30 @@ enum DescuentoEstado {
   RECHAZADO
 }
 
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGE
+  USER_CREATE
+  USER_UPDATE
+  USER_DELETE
+  CONTRACT_CREATE
+  CONTRACT_UPDATE
+  CONTRACT_DELETE
+  PAYMENT_CREATE
+  PAYMENT_APPROVE
+  PAYMENT_REJECT
+  TRANSFER_VERIFY
+  TRANSFER_APPROVE
+  TRANSFER_REJECT
+  FILE_UPLOAD
+  FILE_DOWNLOAD
+  FILE_DELETE
+  CONFIG_UPDATE
+  SYSTEM_ACCESS
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -68,6 +92,7 @@ model User {
   contratosInquilino   Contrato[] @relation("InquilinoContratos")
   transferenciasVerificadas Transferencia[] @relation("VerificadorTransferencias")
   descuentosSolicitados Descuento[] @relation("InquilinoDescuentos")
+  auditLogs AuditLog[]
 
   @@index([inmobiliariaId])
 }
@@ -231,4 +256,29 @@ model Notificacion {
   @@index([pagoId])
   @@index([leida])
   @@index([enviada])
+}
+
+model AuditLog {
+  id           String     @id @default(cuid())
+  userId       String?    // Usuario que realizó la acción
+  userEmail    String?    // Email del usuario (para casos donde el usuario fue eliminado)
+  action       AuditAction
+  resource     String?    // Recurso afectado (ej: /api/users/123)
+  resourceId   String?    // ID del recurso específico
+  details      Json?      // Detalles adicionales de la acción
+  ipAddress    String?    // Dirección IP del usuario
+  userAgent    String?    // User Agent del navegador
+  success      Boolean    @default(true) // Si la acción fue exitosa
+  errorMessage String?    // Mensaje de error si falló
+  createdAt    DateTime   @default(now())
+
+  // Relación opcional con el usuario
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@index([ipAddress])
+  @@index([success])
 }
