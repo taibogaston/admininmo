@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -55,10 +56,15 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md space-y-6 rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold">Ingresa a tu cuenta</h1>
-          <p className="text-sm text-slate-600">Usa las credenciales provistas o registrate para modo demo.</p>
+      <div className="w-full max-w-md space-y-6 rounded-lg border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex justify-between items-start">
+          <div className="space-y-2 text-center flex-1">
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Ingresa a tu cuenta</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Usa las credenciales provistas o registrate para modo demo.</p>
+          </div>
+          <div className="ml-4">
+            <ThemeToggle />
+          </div>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">

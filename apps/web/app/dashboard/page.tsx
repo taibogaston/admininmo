@@ -3,6 +3,7 @@ import { serverApiFetch } from "@/lib/server-api";
 import { User, Contrato } from "@/lib/types";
 import { UserRole } from "@admin-inmo/shared";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { TenantDashboard } from "@/components/dashboard/TenantDashboard";
 import { OwnerDashboard } from "@/components/dashboard/OwnerDashboard";
 
@@ -45,6 +46,7 @@ export default async function DashboardPage() {
               <span aria-hidden>&bull;</span>
               <span className="capitalize">{user.rol.toLowerCase()}</span>
             </div>
+            <ThemeToggle />
             <LogoutButton />
           </div>
         </div>
