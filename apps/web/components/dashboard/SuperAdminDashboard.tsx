@@ -71,7 +71,7 @@ export const SuperAdminDashboard = ({
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary text-white"
+                  ? "bg-primary text-white shadow-sm"
                   : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               )}
               onClick={onNavigate}
@@ -216,11 +216,11 @@ export const SuperAdminDashboard = ({
   };
 
   return (
-    <div className="min-h-screen bg-white transition-colors dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 transition-colors dark:bg-slate-950">
       {/* Mobile Navigation */}
       <div className="lg:hidden">
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm" style={{ display: mobileNavOpen ? "block" : "none" }} onClick={() => setMobileNavOpen(false)} />
-        <div className={cn("fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transition-transform dark:bg-slate-900", mobileNavOpen ? "translate-x-0" : "-translate-x-full")}>
+        <div className={cn("fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transition-transform dark:bg-slate-900 dark:border-r dark:border-slate-800", mobileNavOpen ? "translate-x-0" : "-translate-x-full")}>
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Navegación</h2>
             <Button variant="ghost" size="sm" onClick={() => setMobileNavOpen(false)}>
@@ -236,11 +236,11 @@ export const SuperAdminDashboard = ({
       {/* Desktop Layout */}
       <div className="flex">
         {/* Sidebar */}
-        <aside className="hidden w-72 bg-white shadow-sm lg:block dark:bg-slate-900">
+        <aside className="hidden w-72 bg-white border-r border-slate-200 shadow-sm lg:block dark:bg-slate-900 dark:border-slate-800">
           <div className="sticky top-0 h-screen overflow-y-auto">
             <div className="border-b border-slate-200 px-6 py-6 dark:border-slate-800">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Super Admin</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">Panel de control</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Panel de control</p>
             </div>
             <nav className="p-6">
               <NavigationItems />
@@ -249,8 +249,8 @@ export const SuperAdminDashboard = ({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-h-screen">
-          <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 lg:hidden">
+        <main className="flex-1 min-h-screen bg-slate-50 dark:bg-slate-950">
+          <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 lg:hidden">
             <div className="flex items-center justify-between px-4 py-4">
               <Button variant="ghost" size="sm" onClick={() => setMobileNavOpen(true)}>
                 <Menu className="h-5 w-5" />

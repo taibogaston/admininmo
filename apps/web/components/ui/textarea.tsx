@@ -7,8 +7,27 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({ classN
   return (
     <textarea
       className={cn(
-        "flex min-h-[80px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary placeholder:text-slate-400",
-        "dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500",
+        // Base styles
+        "flex min-h-[100px] w-full rounded-lg border bg-white px-4 py-3 text-sm font-medium text-slate-900",
+        // Shadow and transitions
+        "shadow-sm transition-all duration-200",
+        // Focus states
+        "focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
+        // Hover states
+        "hover:border-slate-400 hover:shadow-md",
+        // Border
+        "border-slate-300",
+        // Placeholder
+        "placeholder:text-slate-400 placeholder:font-normal",
+        // Dark mode
+        "dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100",
+        "dark:hover:border-slate-500",
+        "dark:focus:ring-primary/30 dark:focus:border-primary",
+        "dark:placeholder:text-slate-500",
+        // Disabled state
+        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-300 dark:disabled:hover:border-slate-600",
+        // Resize
+        "resize-y",
         className
       )}
       ref={ref}

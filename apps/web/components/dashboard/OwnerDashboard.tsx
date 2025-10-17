@@ -65,8 +65,8 @@ export const OwnerDashboard = ({ contratos, propietarioId }: OwnerDashboardProps
 
       <section className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-semibold text-slate-900">Detalle de contratos</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Detalle de contratos</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Recordatorio: los ajustes se gestionan desde la cuenta de administrador para mantener coherencia y
             transparencia.
           </p>
@@ -74,40 +74,40 @@ export const OwnerDashboard = ({ contratos, propietarioId }: OwnerDashboardProps
 
         <div className="grid gap-4 lg:grid-cols-2">
           {contratos.map((contrato) => (
-            <Card key={contrato.id} className="flex h-full flex-col justify-between rounded-2xl border-slate-200 p-6 shadow-sm">
+            <Card key={contrato.id} className="flex h-full flex-col justify-between rounded-2xl border-slate-200 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <CardTitle className="text-lg text-slate-900">{contrato.direccion}</CardTitle>
-                    <CardDescription className="text-slate-500">
+                    <CardTitle className="text-lg text-slate-900 dark:text-white">{contrato.direccion}</CardTitle>
+                    <CardDescription className="text-slate-500 dark:text-slate-400">
                       Inquilino: {contrato.inquilino?.nombre} {contrato.inquilino?.apellido}
                     </CardDescription>
                   </div>
                   <StatusBadge status={contrato.estado} />
                 </div>
-                <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 dark:text-slate-300">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Monto total del alquiler</p>
-                    <p className="font-medium text-slate-900">{formatCurrency(contrato.montoTotalAlquiler)}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Monto total del alquiler</p>
+                    <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(contrato.montoTotalAlquiler)}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Comisión inmobiliaria</p>
-                    <p className="font-medium text-slate-900">{contrato.porcentajeComisionInmobiliaria}%</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Comisión inmobiliaria</p>
+                    <p className="font-medium text-slate-900 dark:text-white">{contrato.porcentajeComisionInmobiliaria}%</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Inicio</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Inicio</p>
                     <p>{formatDate(contrato.fechaInicio)}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Fin</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Fin</p>
                     <p>{formatDate(contrato.fechaFin)}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Vencimiento</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Vencimiento</p>
                     <p>Dia {contrato.diaVencimiento}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Ajuste</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Ajuste</p>
                     <p>Cada {contrato.ajusteFrecuenciaMeses} meses</p>
                   </div>
                 </div>
@@ -117,7 +117,7 @@ export const OwnerDashboard = ({ contratos, propietarioId }: OwnerDashboardProps
         </div>
 
         {contratos.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-400">
             Todavia no tenes contratos asignados. El equipo de administracion los vinculara aqui cuando esten listos.
           </div>
         )}

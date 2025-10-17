@@ -696,7 +696,7 @@ export const AdminDashboard = ({
           <section id="users" className="space-y-6">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Usuarios de la inmobiliaria</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">Crealos, comparti la contrasena temporal por un canal seguro y avisa que debe actualizarla al ingresar.</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Crealos, comparti la contrasena temporal por un canal seguro y avisa que debe actualizarla al ingresar.</p>
             </div>
             <Card className="rounded-3xl border-slate-200 p-8 shadow-md dark:border-slate-800 dark:bg-slate-900">
               <form onSubmit={handleCreateUser} className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -776,7 +776,7 @@ export const AdminDashboard = ({
           <section id="assign" className="space-y-6">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Asignar un nuevo contrato</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Define monto, comision, fechas y ajustes en pocos pasos.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Define monto, comision, fechas y ajustes en pocos pasos.</p>
           </div>
           <Card className="rounded-3xl border-slate-200 p-8 shadow-md dark:border-slate-800 dark:bg-slate-900">
             <form onSubmit={handleCreateContract} className="mt-6 space-y-6">
@@ -969,7 +969,7 @@ export const AdminDashboard = ({
           <section id="contracts" className="space-y-6">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Contratos activos</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Gestiona montos, comisiones y ajustes desde aqui.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Gestiona montos, comisiones y ajustes desde aqui.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {contratosOrdenados.map((contrato) => {
@@ -1265,7 +1265,7 @@ export const AdminDashboard = ({
           <section id="discounts" className="space-y-6">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Solicitudes de descuento</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Aprueba o rechaza los casos enviados por inquilinos.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Aprueba o rechaza los casos enviados por inquilinos.</p>
           </div>
           <div className="space-y-4">
             {discountsState.map((descuento) => (
@@ -1275,8 +1275,8 @@ export const AdminDashboard = ({
               >
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <CardTitle className="text-base">{formatCurrency(descuento.monto)}</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-base dark:text-white">{formatCurrency(descuento.monto)}</CardTitle>
+                    <CardDescription className="dark:text-slate-400">
                       {descuento.motivo} - {descuento.contrato.direccion} - {descuento.contrato.inquilino?.nombre} {descuento.contrato.inquilino?.apellido}
                     </CardDescription>
                     <p className="text-xs text-slate-400 dark:text-slate-500">Solicitado el {formatDate(descuento.createdAt)}</p>

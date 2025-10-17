@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Check, Receipt } from "lucide-react";
 import { Contrato, Descuento, Pago } from "@/lib/types";
 import { clientApiFetch } from "@/lib/client-api";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/lib/toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { ConfiguracionPagosInquilino } from "./ConfiguracionPagosInquilino";
 import { ConfiguracionPagosDualInquilino } from "./ConfiguracionPagosDualInquilino";
 
@@ -44,22 +46,89 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const [descuentos, setDescuentos] = useState<Descuento[]>([]);
   const [pagosLoading, setPagosLoading] = useState(false);
   const [descuentosLoading, setDescuentosLoading] = useState(false);
-  const [transferFile, setTransferFile] = useState<File | null>(null);
   const [comprobantePropietario, setComprobantePropietario] = useState<File | null>(null);
   const [comprobanteInmobiliaria, setComprobanteInmobiliaria] = useState<File | null>(null);
-  const [comentarioTransferencia, setComentarioTransferencia] = useState("");
   // Campos removidos: solo necesitamos imagen + externalId del pago
   const [descuentoMonto, setDescuentoMonto] = useState("");
   const [descuentoMotivo, setDescuentoMotivo] = useState("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [descuentoSubmitting, setDescuentoSubmitting] = useState(false);
-  const [mostrarFormularioDescuento, setMostrarFormularioDescuento] = useState(false);
+  const [modalDescuentoOpen, setModalDescuentoOpen] = useState(false);
 
   const handleComprobanteChange = (tipo: 'propietario' | 'inmobiliaria', file: File | null) => {
     if (tipo === 'propietario') {
       setComprobantePropietario(file);
     } else {
       setComprobanteInmobiliaria(file);
+    }
+  };
+
+  const handleSubmitComprobante = async (tipo: 'propietario' | 'inmobiliaria') => {
+    if (!pendingPago) {
+      toast.error("No hay pago pendiente");
+      return;
+    }
+
+    const comprobante = tipo === 'propietario' ? comprobantePropietario : comprobanteInmobiliaria;
+    if (!comprobante) {
+      toast.error("Debes subir el comprobante primero");
+      return;
+    }
+
+    setTransferSubmitting(true);
+
+    try {
+      let pagoId = pendingPago.id;
+      
+      // Si es un pago virtual, primero generamos el pago real
+      if (pendingPago.id.startsWith('virtual-')) {
+        const generateResponse = await clientApiFetch<Pago>(`/api/pagos/generar`, {
+          method: "POST",
+          body: JSON.stringify({
+            contratoId: pendingPago.contratoId,
+            mes: pendingPago.mes,
+            monto: Number(pendingPago.monto)
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        pagoId = generateResponse.id;
+        toast.success("Pago generado correctamente");
+      }
+
+      const formData = new FormData();
+      if (tipo === 'propietario') {
+        formData.append("comprobantePropietario", comprobante);
+      } else {
+        formData.append("comprobanteInmobiliaria", comprobante);
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+      const response = await fetch(`${baseUrl}/api/pagos/${pagoId}/transferencia`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "No se pudo enviar el comprobante");
+      }
+      toast.success(`Comprobante de ${tipo === 'propietario' ? 'Propietario' : 'Inmobiliaria'} enviado correctamente`);
+      
+      // Limpiar el comprobante enviado
+      if (tipo === 'propietario') {
+        setComprobantePropietario(null);
+      } else {
+        setComprobanteInmobiliaria(null);
+      }
+      
+      await recargarPagos(pendingPago.contratoId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo enviar el comprobante";
+      toast.error(message);
+    } finally {
+      setTransferSubmitting(false);
     }
   };
 
@@ -198,76 +267,6 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
     }
   };
 
-  const handleTransferSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!pendingPago) {
-      toast.error("No hay pago pendiente");
-      return;
-    }
-
-    // Validar que se hayan subido ambos comprobantes
-    if (!comprobantePropietario && !comprobanteInmobiliaria) {
-      toast.error("Debes subir al menos un comprobante de transferencia");
-      return;
-    }
-
-    setTransferSubmitting(true);
-
-    try {
-      let pagoId = pendingPago.id;
-      
-      // Si es un pago virtual, primero generamos el pago real
-      if (pendingPago.id.startsWith('virtual-')) {
-        const generateResponse = await clientApiFetch<Pago>(`/api/pagos/generar`, {
-          method: "POST",
-          body: JSON.stringify({
-            contratoId: pendingPago.contratoId,
-            mes: pendingPago.mes,
-            monto: Number(pendingPago.monto)
-          }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        pagoId = generateResponse.id;
-        toast.success("Pago generado correctamente");
-      }
-
-      const formData = new FormData();
-      if (comprobantePropietario) {
-        formData.append("comprobantePropietario", comprobantePropietario);
-      }
-      if (comprobanteInmobiliaria) {
-        formData.append("comprobanteInmobiliaria", comprobanteInmobiliaria);
-      }
-      if (comentarioTransferencia) {
-        formData.append("comentario", comentarioTransferencia);
-      }
-      // Solo enviamos la imagen del comprobante + externalId del pago
-
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-      const response = await fetch(`${baseUrl}/api/pagos/${pagoId}/transferencia`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "No se pudo enviar el comprobante");
-      }
-      toast.success("Comprobantes enviados para validación");
-      setComprobantePropietario(null);
-      setComprobanteInmobiliaria(null);
-      setComentarioTransferencia("");
-      await recargarPagos(pendingPago.contratoId);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo enviar el comprobante";
-      toast.error(message);
-    } finally {
-      setTransferSubmitting(false);
-    }
-  };
-
   const handleSolicitarDescuento = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedContratoId) return;
@@ -291,7 +290,7 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       toast.success("Solicitud de descuento enviada");
       setDescuentoMonto("");
       setDescuentoMotivo("");
-      setMostrarFormularioDescuento(false);
+      setModalDescuentoOpen(false);
       await recargarDescuentos(selectedContratoId);
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo registrar el descuento";
@@ -322,15 +321,15 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
               descuento y el equipo lo revisa cuanto antes.
             </p>
           </div>
-          <div className="w-full max-w-xs space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <Label htmlFor="contrato" className="text-slate-200">
+          <div className="w-full max-w-xs space-y-2 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+            <Label htmlFor="contrato" className="text-slate-200 text-xs uppercase tracking-wider font-semibold">
               Selecciona el contrato a visualizar
             </Label>
             <Select
               id="contrato"
               value={selectedContratoId ?? ""}
               onChange={(event) => setSelectedContratoId(event.target.value || null)}
-              className="rounded-xl border-white/30 bg-white/10 text-white"
+              className="!bg-slate-800/90 !border-white/20 !text-white hover:!bg-slate-700/90 hover:!border-white/30 focus:!border-white/50 focus:!ring-white/20 shadow-lg backdrop-blur-md [&>option]:!bg-slate-800 [&>option]:!text-white [&>option:checked]:!bg-slate-700"
             >
               {contratos.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -364,135 +363,83 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
         </p>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_minmax(0,0.9fr)]">
-        <Card className="h-full overflow-hidden rounded-3xl border-slate-200 p-6 shadow-md">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg">Pagos y comprobantes</CardTitle>
-            {pendingPago && (
-              <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                Pendiente {pendingPago.mes}: {formatCurrency(totalAPagar)}
-              </span>
-            )}
-          </div>
-
-          {pagosLoading ? (
-            <p className="mt-4 text-sm text-slate-500">Cargando pagos...</p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {pagos.map((pago) => (
-                <div
-                  key={pago.id}
-                  className="flex flex-col justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center"
+      {/* Sección de Pago con Transferencias */}
+      {pendingPago && (
+        <section className="space-y-6">
+          {/* Mostrar el total a pagar destacado con botón de descuento */}
+          <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 border-2 border-primary/30">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  Pago del mes {pendingPago.mes}
+                </p>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(totalAPagar)}
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="text-left sm:text-right">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">ID de Referencia</p>
+                  <p className="font-mono text-sm font-bold text-primary bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+                    {pendingPago.externalId}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setModalDescuentoOpen(true)}
+                  className="whitespace-nowrap"
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Mes {pago.mes}</p>
-                    <p className="text-xs text-slate-500">{formatCurrency(pago.monto)}</p>
-                  </div>
-                  <StatusBadge status={pago.estado} />
-                </div>
-              ))}
-              {pagos.length === 0 && (
-                <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                  Todavia no hay pagos registrados.
-                </p>
-              )}
-            </div>
-          )}
-
-          {pendingPago && (
-            <div className="mt-6 space-y-6">
-              <ConfiguracionPagosDualInquilino 
-                inmobiliariaId={contratos.find(c => c.id === selectedContratoId)?.inmobiliariaId || ""} 
-                onComprobanteChange={handleComprobanteChange}
-                comprobantePropietario={comprobantePropietario}
-                comprobanteInmobiliaria={comprobanteInmobiliaria}
-              />
-              
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-900">Completar el pago de {pendingPago.mes}</p>
-                <p className="mb-4 text-xs text-slate-500">
-                  Total a pagar: {formatCurrency(totalAPagar)}. Sube el comprobante de transferencia para validarlo.
-                </p>
-              <form onSubmit={handleTransferSubmit} className="mt-4 grid gap-3" encType="multipart/form-data">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="transfer-file">Comprobante (opcional)</Label>
-                    <Input
-                      id="transfer-file"
-                      type="file"
-                      accept="application/pdf,image/*"
-                      onChange={(event) => setTransferFile(event.target.files?.[0] ?? null)}
-                    />
-                  </div>
-                  <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>ID de Referencia:</strong> {pendingPago.externalId}
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
-                      Usa este ID como referencia en tu transferencia para que el administrador pueda verificar el pago.
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="transfer-comment">Comentario adicional (opcional)</Label>
-                  <Input
-                    id="transfer-comment"
-                    value={comentarioTransferencia}
-                    onChange={(event) => setComentarioTransferencia(event.target.value)}
-                    placeholder="Ej. Banco y referencia"
-                  />
-                </div>
-                <div className="space-y-2">
-                  {/* Indicador de comprobantes */}
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className={`flex items-center gap-2 ${comprobantePropietario ? 'text-green-600' : 'text-slate-400'}`}>
-                      <div className={`w-2 h-2 rounded-full ${comprobantePropietario ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                      <span>Comprobante Propietario {comprobantePropietario ? '✓' : '○'}</span>
-                    </div>
-                    <div className={`flex items-center gap-2 ${comprobanteInmobiliaria ? 'text-green-600' : 'text-slate-400'}`}>
-                      <div className={`w-2 h-2 rounded-full ${comprobanteInmobiliaria ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                      <span>Comprobante Inmobiliaria {comprobanteInmobiliaria ? '✓' : '○'}</span>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    type="submit" 
-                    variant="outline" 
-                    disabled={transferSubmitting || (!comprobantePropietario && !comprobanteInmobiliaria)}
-                    className="w-full"
-                  >
-                    {transferSubmitting ? "Enviando..." : "Enviar datos de transferencia"}
-                  </Button>
-                </div>
-              </form>
+                  <Receipt className="w-4 h-4 mr-2" />
+                  Solicitar descuento
+                </Button>
               </div>
             </div>
-          )}
-        </Card>
-
-        <Card className="h-full rounded-3xl border-slate-200 p-6 shadow-md">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg">Descuentos solicitados</CardTitle>
-            <Button
-              type="button"
-              variant={mostrarFormularioDescuento ? "outline" : "default"}
-              onClick={() => setMostrarFormularioDescuento((value) => !value)}
-              className="sm:w-auto"
-            >
-              {mostrarFormularioDescuento ? "Cancelar" : "Solicitar descuento"}
-            </Button>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Solicitalo cuando debas descontar expensas extraordinarias o arreglos asumidos por tu cuenta.
-          </p>
+          
+          <ConfiguracionPagosDualInquilino 
+            inmobiliariaId={contratos.find(c => c.id === selectedContratoId)?.inmobiliariaId || ""} 
+            onComprobanteChange={handleComprobanteChange}
+            comprobantePropietario={comprobantePropietario}
+            comprobanteInmobiliaria={comprobanteInmobiliaria}
+            onSubmitComprobante={handleSubmitComprobante}
+            isSubmitting={transferSubmitting}
+          />
+        </section>
+      )}
 
-          {mostrarFormularioDescuento && (
-            <form className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" onSubmit={handleSolicitarDescuento}>
-              <div className="grid gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="descuento-monto">Monto a descontar</Label>
+      <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-md sm:grid-cols-3 dark:border-slate-800 dark:bg-slate-900">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Inicio</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-white">{formatDate(contrato.fechaInicio)}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Fin</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-white">{formatDate(contrato.fechaFin)}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Frecuencia de ajuste</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-white">{ajustesLabel}</p>
+        </div>
+      </section>
+
+      {/* Modal de Solicitar Descuento */}
+      <Dialog open={modalDescuentoOpen} onOpenChange={setModalDescuentoOpen}>
+        <DialogContent onClose={() => setModalDescuentoOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Solicitar Descuento</DialogTitle>
+            <DialogDescription>
+              Solicitalo cuando debas descontar expensas extraordinarias o arreglos asumidos por tu cuenta
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSolicitarDescuento}>
+            <DialogBody>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="modal-descuento-monto">Monto a descontar</Label>
                   <Input
-                    id="descuento-monto"
+                    id="modal-descuento-monto"
                     type="number"
                     min={0}
                     step="0.01"
@@ -502,64 +449,36 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
                     required
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="descuento-motivo">Detalle</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="modal-descuento-motivo">Detalle</Label>
                   <Textarea
-                    id="descuento-motivo"
+                    id="modal-descuento-motivo"
                     value={descuentoMotivo}
                     onChange={(event) => setDescuentoMotivo(event.target.value)}
-                    placeholder="Contanos brevemente el motivo"
-                    rows={3}
+                    placeholder="Contanos brevemente el motivo del descuento"
+                    rows={4}
                     required
                   />
                 </div>
               </div>
+            </DialogBody>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setModalDescuentoOpen(false)}
+                disabled={descuentoSubmitting}
+              >
+                Cancelar
+              </Button>
               <Button type="submit" disabled={descuentoSubmitting}>
                 {descuentoSubmitting ? "Enviando..." : "Enviar solicitud"}
               </Button>
-            </form>
-          )}
-
-          <div className="mt-4 space-y-3">
-            {descuentosLoading ? (
-              <p className="text-sm text-slate-500">Cargando descuentos...</p>
-            ) : descuentos.length > 0 ? (
-              descuentos.map((descuento) => (
-                <div
-                  key={descuento.id}
-                  className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{formatCurrency(descuento.monto)}</p>
-                    <p className="text-xs text-slate-500">{descuento.motivo}</p>
-                    <p className="text-xs text-slate-400">Solicitado el {formatDate(descuento.createdAt)}</p>
-                  </div>
-                  <StatusBadge status={descuento.estado} />
-                </div>
-              ))
-            ) : (
-              <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                Todavia no solicitaste descuentos.
-              </p>
-            )}
-          </div>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-md sm:grid-cols-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Inicio</p>
-          <p className="text-sm font-medium text-slate-900">{formatDate(contrato.fechaInicio)}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Fin</p>
-          <p className="text-sm font-medium text-slate-900">{formatDate(contrato.fechaFin)}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Frecuencia de ajuste</p>
-          <p className="text-sm font-medium text-slate-900">{ajustesLabel}</p>
-        </div>
-      </section>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

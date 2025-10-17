@@ -106,11 +106,11 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-4 bg-slate-200 rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
           <div className="space-y-4">
-            <div className="h-10 bg-slate-200 rounded"></div>
-            <div className="h-10 bg-slate-200 rounded"></div>
-            <div className="h-10 bg-slate-200 rounded"></div>
+            <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded"></div>
           </div>
         </div>
       </div>
@@ -123,15 +123,15 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Configuración de Pagos Manuales
         </h2>
-        <p className="text-slate-600 dark:text-slate-300 mt-2">
+        <p className="text-slate-600 dark:text-slate-400 mt-2">
           Configura el CBU y QR donde los inquilinos realizarán las transferencias
         </p>
       </div>
 
-      <Card>
+      <Card className="dark:border-slate-800 dark:bg-slate-900">
         <CardHeader>
-          <CardTitle>Datos de Transferencia</CardTitle>
-          <CardDescription>
+          <CardTitle className="dark:text-white">Datos de Transferencia</CardTitle>
+          <CardDescription className="dark:text-slate-400">
             Esta información será visible para los inquilinos al realizar pagos
           </CardDescription>
         </CardHeader>
@@ -152,7 +152,7 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                   required
                   readOnly={readonly}
                 />
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   CBU donde los inquilinos deben transferir el dinero
                 </p>
               </div>
@@ -168,7 +168,7 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                   maxLength={50}
                   readOnly={readonly}
                 />
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Alias del CBU (opcional)
                 </p>
               </div>
@@ -184,7 +184,7 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                   maxLength={100}
                   readOnly={readonly}
                 />
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Nombre del banco (opcional)
                 </p>
               </div>
@@ -206,7 +206,7 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                   placeholder="3.0"
                   readOnly={readonly}
                 />
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Porcentaje de comisión que recibe la inmobiliaria (ej: 3.0 para 3%)
                 </p>
               </div>
@@ -219,14 +219,14 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                     type="checkbox"
                     checked={formData.activo}
                     onChange={(e) => handleInputChange("activo", e.target.checked)}
-                    className="rounded border-slate-300"
+                    className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800"
                     disabled={readonly}
                   />
                   <Label htmlFor="activo" className="text-sm">
                     Configuración activa
                   </Label>
                 </div>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Solo los inquilinos pueden ver configuraciones activas
                 </p>
               </div>
@@ -242,7 +242,7 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                 rows={4}
                 readOnly={readonly}
               />
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Código QR generado con los datos del CBU (opcional)
               </p>
             </div>
@@ -259,10 +259,10 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
       </Card>
 
       {configuracion && (
-        <Card>
+        <Card className="dark:border-slate-800 dark:bg-slate-900">
           <CardHeader>
-            <CardTitle>Vista Previa para Inquilinos</CardTitle>
-            <CardDescription>
+            <CardTitle className="dark:text-white">Vista Previa para Inquilinos</CardTitle>
+            <CardDescription className="dark:text-slate-400">
               Así verán los datos los inquilinos al realizar pagos
             </CardDescription>
           </CardHeader>
@@ -293,7 +293,7 @@ export const ConfiguracionPagosForm = ({ inmobiliariaId, initialData, readonly =
                     <img 
                       src={`data:image/png;base64,${formData.qrCode}`} 
                       alt="QR Code" 
-                      className="w-32 h-32 border border-slate-300 rounded"
+                      className="w-32 h-32 border border-slate-300 dark:border-slate-600 rounded"
                     />
                   </div>
                 </div>

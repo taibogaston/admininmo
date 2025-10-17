@@ -214,9 +214,6 @@ export const TransferenciasPendientesList = ({ inmobiliariaId, userRole }: Trans
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Transferencias Pendientes
         </h2>
-        <p className="text-slate-600 dark:text-slate-300 mt-2">
-          Verifica y ejecuta las transferencias manuales de los inquilinos
-        </p>
       </div>
 
       <div className="space-y-4">
