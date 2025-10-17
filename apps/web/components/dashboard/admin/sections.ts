@@ -18,7 +18,7 @@ export const ADMIN_SECTIONS: readonly AdminSectionConfig[] = [
   { id: "contracts", label: "Contratos", icon: FileText, roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
   { id: "discounts", label: "Descuentos", icon: Percent, roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
   { id: "transfers", label: "Transferencias", icon: ArrowLeftRight, roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-  { id: "configuracion-pagos", label: "Configuración de Pagos", icon: Settings, roles: [UserRole.SUPER_ADMIN] },
+  { id: "configuracion-pagos", label: "Configuración de Pagos", icon: Settings, roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
 ] as const;
 
 export const getAdminSectionsForRole = (role: UserRole): AdminSectionConfig[] => {

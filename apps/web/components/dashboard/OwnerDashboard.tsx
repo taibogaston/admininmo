@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/badge";
 
 interface OwnerDashboardProps {
   contratos: Contrato[];
+  propietarioId: string;
 }
 
 const formatCurrency = (value: string | number) => {
@@ -20,7 +21,7 @@ const formatDate = (value: string) => {
   return date.toLocaleDateString("es-AR", { year: "numeric", month: "short", day: "numeric" });
 };
 
-export const OwnerDashboard = ({ contratos }: OwnerDashboardProps) => {
+export const OwnerDashboard = ({ contratos, propietarioId }: OwnerDashboardProps) => {
   const totalContratos = contratos.length;
   const totalIngresos = contratos.reduce((acc, contrato) => {
     const montoTotal = Number(contrato.montoTotalAlquiler ?? 0);
@@ -121,6 +122,7 @@ export const OwnerDashboard = ({ contratos }: OwnerDashboardProps) => {
           </div>
         )}
       </section>
+
     </div>
   );
 };

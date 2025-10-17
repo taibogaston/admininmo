@@ -33,6 +33,11 @@ export enum TransferenciaEstado {
   RECHAZADO = "RECHAZADO",
 }
 
+export enum TipoComprobante {
+  PROPIETARIO = "PROPIETARIO",
+  INMOBILIARIA = "INMOBILIARIA",
+}
+
 export enum DescuentoEstado {
   PENDIENTE = "PENDIENTE",
   APROBADO = "APROBADO",
@@ -97,15 +102,29 @@ export interface ConfiguracionPagosPublica {
 export interface TransferenciaManual {
   id: string;
   pagoId: string;
-  comprobantePath?: string;
+  comprobantePath?: string; // Mantener para compatibilidad
+  comprobantePropietarioPath?: string;
+  comprobanteInmobiliariaPath?: string;
   verificado: TransferenciaEstado;
   verificadoPorId?: string;
   verificadoAt?: string;
   comentario?: string;
   transferenciaPropietarioId?: string;
   transferenciaInmobiliariaId?: string;
+  verificaciones?: VerificacionComprobante[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VerificacionComprobante {
+  id: string;
+  transferenciaId: string;
+  tipoComprobante: TipoComprobante;
+  verificado: boolean;
+  verificadoPorId: string;
+  verificadoAt: string;
+  comentario?: string;
+  createdAt: string;
 }
 
 export interface Notificacion {

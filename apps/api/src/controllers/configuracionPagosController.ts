@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
-import { getConfiguracionPagos, createOrUpdateConfiguracionPagos, getConfiguracionPagosPublica } from "../services/configuracionPagosService";
+import { 
+  getConfiguracionPagos, 
+  createOrUpdateConfiguracionPagos, 
+  createOrUpdateConfiguracionPagosInmobiliaria,
+  createOrUpdateConfiguracionPagosPropietario,
+  getConfiguracionPagosPublica 
+} from "../services/configuracionPagosService";
 import { HttpError } from "../utils/errors";
 import { AuthTokenPayload } from "@admin-inmo/shared";
 
@@ -23,6 +29,32 @@ export const createOrUpdateConfiguracionPagosController = async (req: Authentica
     res.json(configuracion);
   } catch (error) {
     console.error("Error en createOrUpdateConfiguracionPagosController:", error);
+    throw error;
+  }
+};
+
+export const createOrUpdateConfiguracionPagosInmobiliariaController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  
+  try {
+    const { inmobiliariaId } = req.params;
+    const configuracion = await createOrUpdateConfiguracionPagosInmobiliaria(inmobiliariaId, req.body, req.user);
+    res.json(configuracion);
+  } catch (error) {
+    console.error("Error en createOrUpdateConfiguracionPagosInmobiliariaController:", error);
+    throw error;
+  }
+};
+
+export const createOrUpdateConfiguracionPagosPropietarioController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  
+  try {
+    const { inmobiliariaId } = req.params;
+    const configuracion = await createOrUpdateConfiguracionPagosPropietario(inmobiliariaId, req.body, req.user);
+    res.json(configuracion);
+  } catch (error) {
+    console.error("Error en createOrUpdateConfiguracionPagosPropietarioController:", error);
     throw error;
   }
 };

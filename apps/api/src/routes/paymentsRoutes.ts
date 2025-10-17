@@ -8,10 +8,11 @@ import {
   ejecutarTransferenciasManualesController,
   listTransferenciasPendientesController,
   listTransferenciasInmobiliariaController,
+  listTransferenciasPropietarioController,
   getDivisionMontosController,
 } from "../controllers/paymentController";
 import { requireAuth, requireRole } from "../auth";
-import { transferenciaUpload } from "../middlewares/upload";
+import { transferenciaUpload, transferenciaDualUpload } from "../middlewares/upload";
 import { UserRole } from "@admin-inmo/shared";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -24,10 +25,10 @@ pagosRoutes.post(
   requireRole(UserRole.ADMIN, UserRole.PROPIETARIO, UserRole.SUPER_ADMIN, UserRole.INQUILINO),
   asyncHandler(generatePagoController)
 );
-// Ruta para listar transferencias pendientes (solo SUPER_ADMIN)
+// Ruta para listar transferencias pendientes (SUPER_ADMIN y ADMIN)
 pagosRoutes.get(
   "/transferencias-pendientes/:inmobiliariaId",
-  requireRole(UserRole.SUPER_ADMIN),
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
   asyncHandler(listTransferenciasPendientesController)
 );
 
@@ -36,6 +37,13 @@ pagosRoutes.get(
   "/transferencias-inmobiliaria",
   requireRole(UserRole.ADMIN),
   asyncHandler(listTransferenciasInmobiliariaController)
+);
+
+// Ruta para que PROPIETARIO vea sus transferencias
+pagosRoutes.get(
+  "/transferencias-propietario/:propietarioId",
+  requireRole(UserRole.PROPIETARIO),
+  asyncHandler(listTransferenciasPropietarioController)
 );
 
 // Ruta para obtener división de montos (solo SUPER_ADMIN)
@@ -48,20 +56,20 @@ pagosRoutes.get(
 pagosRoutes.post("/:pagoId/mp/preference", asyncHandler(createPreferenceController));
 pagosRoutes.post(
   "/:pagoId/transferencia",
-  transferenciaUpload.single("comprobante"),
+  transferenciaDualUpload,
   asyncHandler(registerTransferenciaController)
 );
 pagosRoutes.get("/:pagoId", asyncHandler(getPagoController));
 
-// Rutas para verificación y ejecución de transferencias manuales (solo SUPER_ADMIN)
+// Rutas para verificación y ejecución de transferencias manuales (SUPER_ADMIN y ADMIN)
 pagosRoutes.post(
   "/:pagoId/verificar",
-  requireRole(UserRole.SUPER_ADMIN),
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROPIETARIO),
   asyncHandler(verificarTransferenciaController)
 );
 pagosRoutes.post(
   "/:pagoId/ejecutar-transferencias",
-  requireRole(UserRole.SUPER_ADMIN),
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
   asyncHandler(ejecutarTransferenciasManualesController)
 );
 

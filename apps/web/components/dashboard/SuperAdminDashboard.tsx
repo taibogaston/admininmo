@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Menu, X } from "lucide-react";
-import { InmobiliariaWithCounts, ConfiguracionPagos, TransferenciaManual } from "@/lib/types";
+import { InmobiliariaWithCounts, TransferenciaManual } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SUPER_ADMIN_SECTIONS, SuperAdminSection } from "./super-admin/sections";
 import { CreateInmobiliariaForm } from "@/components/super-admin/CreateInmobiliariaForm";
-import { ConfiguracionPagosForm } from "@/components/dashboard/admin/ConfiguracionPagosForm";
 import { TransferenciasPendientesList } from "@/components/dashboard/admin/TransferenciasPendientesList";
 import { clientApiFetch } from "@/lib/client-api";
 
@@ -24,7 +23,6 @@ export const SuperAdminDashboard = ({
 }: SuperAdminDashboardProps) => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [inmobiliarias, setInmobiliarias] = useState<InmobiliariaWithCounts[]>(initialInmobiliarias);
-  const [configuraciones, setConfiguraciones] = useState<ConfiguracionPagos[]>([]);
   const [transferencias, setTransferencias] = useState<TransferenciaManual[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -38,20 +36,7 @@ export const SuperAdminDashboard = ({
     const loadSectionData = async () => {
       setLoading(true);
       try {
-        if (activeSection === "configuracion-pagos") {
-          // Cargar configuraciones de pagos para todas las inmobiliarias
-          const configs = await Promise.all(
-            inmobiliarias.map(async (inmobiliaria) => {
-              try {
-                const config = await clientApiFetch<ConfiguracionPagos>(`/api/configuracion-pagos/${inmobiliaria.id}`);
-                return config;
-              } catch {
-                return null;
-              }
-            })
-          );
-          setConfiguraciones(configs.filter(Boolean) as ConfiguracionPagos[]);
-        } else if (activeSection === "transferencias") {
+        if (activeSection === "transferencias") {
           // Cargar transferencias pendientes para todas las inmobiliarias
           const allTransferencias: TransferenciaManual[] = [];
           for (const inmobiliaria of inmobiliarias) {
@@ -203,36 +188,6 @@ export const SuperAdminDashboard = ({
           </div>
         );
 
-      case "configuracion-pagos":
-        return (
-          <div className="space-y-8">
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Configuración de Pagos</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Configura los datos bancarios para cada inmobiliaria.
-                </p>
-              </div>
-              <div className="p-6">
-                {inmobiliarias.map((inmobiliaria) => {
-                  const config = configuraciones.find(c => c.inmobiliariaId === inmobiliaria.id);
-                  return (
-                    <div key={inmobiliaria.id} className="mb-6 last:mb-0">
-                      <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-4">
-                        {inmobiliaria.nombre}
-                      </h3>
-                      <ConfiguracionPagosForm 
-                        inmobiliariaId={inmobiliaria.id} 
-                        initialData={config || undefined}
-                        readonly={false}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
 
       case "transferencias":
         return (

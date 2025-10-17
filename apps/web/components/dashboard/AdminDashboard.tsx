@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { UserRole } from "@admin-inmo/shared";
 import { ConfiguracionPagosForm } from "./admin/ConfiguracionPagosForm";
+import { ConfiguracionPagosDualForm } from "./admin/ConfiguracionPagosDualForm";
 import { TransferenciasPendientesList } from "./admin/TransferenciasPendientesList";
-import { TransferenciasInmobiliariaList } from "./admin/TransferenciasInmobiliariaList";
 
 type UserOption = Pick<User, "id" | "nombre" | "apellido" | "email" | "rol" | "dni">;
 
@@ -104,6 +104,7 @@ export const AdminDashboard = ({
   const [owners, setOwners] = useState<UserOption[]>([]);
   const [tenants, setTenants] = useState<UserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [comentariosTransferencia, setComentariosTransferencia] = useState<Record<string, string>>({});
   const [createUserForm, setCreateUserForm] = useState({
     dni: "",
@@ -215,6 +216,28 @@ export const AdminDashboard = ({
   useEffect(() => {
     setMobileNavOpen(false);
   }, [activeSection]);
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const user = await clientApiFetch<User>("/api/auth/me");
+        setCurrentUser(user);
+      } catch (err) {
+        console.error("Error fetching current user:", err);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Helper function to get the correct inmobiliariaId
+  const getInmobiliariaId = (): string => {
+    // For ADMIN users, use their inmobiliariaId
+    if (userRole === UserRole.ADMIN && currentUser?.inmobiliariaId) {
+      return currentUser.inmobiliariaId;
+    }
+    // For SUPER_ADMIN, use the first contract's inmobiliariaId (fallback)
+    return contracts[0]?.inmobiliariaId || "";
+  };
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -1289,24 +1312,27 @@ export const AdminDashboard = ({
         )}
         {activeSection === "transfers" && (
           <section id="transfers" className="space-y-6">
-            {userRole === UserRole.SUPER_ADMIN ? (
-              <TransferenciasPendientesList inmobiliariaId={contratos[0]?.inmobiliariaId || ""} />
-            ) : (
-              <TransferenciasInmobiliariaList transferencias={transferencias} />
-            )}
+            <TransferenciasPendientesList inmobiliariaId={getInmobiliariaId()} userRole={userRole} />
           </section>
         )}
         {activeSection === "configuracion-pagos" && (
           <section id="configuracion-pagos" className="space-y-6">
-            {userRole === UserRole.SUPER_ADMIN ? (
+            {userRole === UserRole.ADMIN ? (
               <>
-                <ConfiguracionPagosForm inmobiliariaId={contratos[0]?.inmobiliariaId || ""} />
+                <ConfiguracionPagosDualForm inmobiliariaId={getInmobiliariaId()} />
                 <div className="mt-8">
-                  <TransferenciasPendientesList inmobiliariaId={contratos[0]?.inmobiliariaId || ""} />
+                  <TransferenciasPendientesList inmobiliariaId={getInmobiliariaId()} userRole={userRole} />
+                </div>
+              </>
+            ) : userRole === UserRole.SUPER_ADMIN ? (
+              <>
+                <ConfiguracionPagosForm inmobiliariaId={getInmobiliariaId()} />
+                <div className="mt-8">
+                  <TransferenciasPendientesList inmobiliariaId={getInmobiliariaId()} userRole={userRole} />
                 </div>
               </>
             ) : (
-              <ConfiguracionPagosForm inmobiliariaId={contratos[0]?.inmobiliariaId || ""} readonly={true} />
+              <ConfiguracionPagosForm inmobiliariaId={getInmobiliariaId()} readonly={true} />
             )}
           </section>
         )}

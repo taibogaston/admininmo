@@ -121,8 +121,82 @@ export const getTransferenciaFile = async (id: string, actor: AuthTokenPayload) 
     throw new HttpError(403, "No tienes acceso a esta transferencia");
   }
 
-  if (transferencia.comprobantePath && !fs.existsSync(transferencia.comprobantePath)) {
-    throw new HttpError(404, "Archivo no encontrado");
+  // Verificar que al menos uno de los comprobantes existe
+  const propietarioExists = transferencia.comprobantePropietarioPath && fs.existsSync(transferencia.comprobantePropietarioPath);
+  const inmobiliariaExists = transferencia.comprobanteInmobiliariaPath && fs.existsSync(transferencia.comprobanteInmobiliariaPath);
+  
+  if (!propietarioExists && !inmobiliariaExists) {
+    throw new HttpError(404, "Archivos no encontrados");
+  }
+
+  return transferencia;
+};
+
+export const getTransferenciaFilePropietario = async (id: string, actor: AuthTokenPayload) => {
+  if (actor.role !== UserRole.ADMIN && actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.PROPIETARIO) {
+    throw new HttpError(403, "No tenés permisos suficientes");
+  }
+
+  const transferencia = await prisma.transferencia.findUnique({
+    where: { id },
+    include: {
+      pago: {
+        include: { contrato: true },
+      },
+    },
+  });
+  if (!transferencia) {
+    throw new HttpError(404, "Transferencia no encontrada");
+  }
+
+  // Validar permisos según el rol
+  if (actor.role === UserRole.PROPIETARIO) {
+    // El propietario solo puede ver su propio comprobante
+    if (transferencia.pago.contrato.propietarioId !== actor.id) {
+      throw new HttpError(403, "No tenés acceso a esta transferencia");
+    }
+  } else if (
+    actor.role === UserRole.ADMIN &&
+    actor.inmobiliariaId &&
+    transferencia.pago.contrato.inmobiliariaId !== actor.inmobiliariaId
+  ) {
+    throw new HttpError(403, "No tienes acceso a esta transferencia");
+  }
+
+  if (!transferencia.comprobantePropietarioPath || !fs.existsSync(transferencia.comprobantePropietarioPath)) {
+    throw new HttpError(404, "Comprobante del propietario no encontrado");
+  }
+
+  return transferencia;
+};
+
+export const getTransferenciaFileInmobiliaria = async (id: string, actor: AuthTokenPayload) => {
+  if (actor.role !== UserRole.ADMIN && actor.role !== UserRole.SUPER_ADMIN) {
+    throw new HttpError(403, "Sólo administradores");
+  }
+
+  const transferencia = await prisma.transferencia.findUnique({
+    where: { id },
+    include: {
+      pago: {
+        include: { contrato: true },
+      },
+    },
+  });
+  if (!transferencia) {
+    throw new HttpError(404, "Transferencia no encontrada");
+  }
+
+  if (
+    actor.role === UserRole.ADMIN &&
+    actor.inmobiliariaId &&
+    transferencia.pago.contrato.inmobiliariaId !== actor.inmobiliariaId
+  ) {
+    throw new HttpError(403, "No tienes acceso a esta transferencia");
+  }
+
+  if (!transferencia.comprobanteInmobiliariaPath || !fs.existsSync(transferencia.comprobanteInmobiliariaPath)) {
+    throw new HttpError(404, "Comprobante de la inmobiliaria no encontrado");
   }
 
   return transferencia;

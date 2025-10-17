@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/lib/toast";
 import { ConfiguracionPagosInquilino } from "./ConfiguracionPagosInquilino";
+import { ConfiguracionPagosDualInquilino } from "./ConfiguracionPagosDualInquilino";
 
 interface TenantDashboardProps {
   contratos: Contrato[];
@@ -44,6 +45,8 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const [pagosLoading, setPagosLoading] = useState(false);
   const [descuentosLoading, setDescuentosLoading] = useState(false);
   const [transferFile, setTransferFile] = useState<File | null>(null);
+  const [comprobantePropietario, setComprobantePropietario] = useState<File | null>(null);
+  const [comprobanteInmobiliaria, setComprobanteInmobiliaria] = useState<File | null>(null);
   const [comentarioTransferencia, setComentarioTransferencia] = useState("");
   // Campos removidos: solo necesitamos imagen + externalId del pago
   const [descuentoMonto, setDescuentoMonto] = useState("");
@@ -51,6 +54,14 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [descuentoSubmitting, setDescuentoSubmitting] = useState(false);
   const [mostrarFormularioDescuento, setMostrarFormularioDescuento] = useState(false);
+
+  const handleComprobanteChange = (tipo: 'propietario' | 'inmobiliaria', file: File | null) => {
+    if (tipo === 'propietario') {
+      setComprobantePropietario(file);
+    } else {
+      setComprobanteInmobiliaria(file);
+    }
+  };
 
   useEffect(() => {
     if (!selectedContratoId) {
@@ -160,37 +171,6 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
 
   const siguienteMonto = formatCurrency(totalAPagar);
 
-  const handleMercadoPago = async () => {
-    if (!pendingPago) return;
-    try {
-      let pagoId = pendingPago.id;
-      
-      // Si es un pago virtual, primero generamos el pago real
-      if (pendingPago.id.startsWith('virtual-')) {
-        const generateResponse = await clientApiFetch<Pago>(`/api/pagos/generar`, {
-          method: "POST",
-          body: JSON.stringify({
-            contratoId: pendingPago.contratoId,
-            mes: pendingPago.mes,
-            monto: Number(pendingPago.monto)
-          }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        pagoId = generateResponse.id;
-        await recargarPagos(pendingPago.contratoId);
-      }
-
-      const preference = await clientApiFetch<{ init_point: string }>(`/api/pagos/${pagoId}/mp/preference`, {
-        method: "POST",
-      });
-      window.location.href = preference.init_point;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo iniciar el pago";
-      toast.error(message);
-    }
-  };
 
   const recargarPagos = async (contratoId: string) => {
     setPagosLoading(true);
@@ -224,6 +204,13 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       toast.error("No hay pago pendiente");
       return;
     }
+
+    // Validar que se hayan subido ambos comprobantes
+    if (!comprobantePropietario && !comprobanteInmobiliaria) {
+      toast.error("Debes subir al menos un comprobante de transferencia");
+      return;
+    }
+
     setTransferSubmitting(true);
 
     try {
@@ -247,8 +234,11 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
       }
 
       const formData = new FormData();
-      if (transferFile) {
-        formData.append("comprobante", transferFile);
+      if (comprobantePropietario) {
+        formData.append("comprobantePropietario", comprobantePropietario);
+      }
+      if (comprobanteInmobiliaria) {
+        formData.append("comprobanteInmobiliaria", comprobanteInmobiliaria);
       }
       if (comentarioTransferencia) {
         formData.append("comentario", comentarioTransferencia);
@@ -265,8 +255,9 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
         const text = await response.text();
         throw new Error(text || "No se pudo enviar el comprobante");
       }
-      toast.success("Comprobante enviado para validación");
-      setTransferFile(null);
+      toast.success("Comprobantes enviados para validación");
+      setComprobantePropietario(null);
+      setComprobanteInmobiliaria(null);
       setComentarioTransferencia("");
       await recargarPagos(pendingPago.contratoId);
     } catch (err) {
@@ -410,20 +401,18 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
 
           {pendingPago && (
             <div className="mt-6 space-y-6">
-              <ConfiguracionPagosInquilino inmobiliariaId={contratos.find(c => c.id === selectedContratoId)?.inmobiliariaId || ""} />
+              <ConfiguracionPagosDualInquilino 
+                inmobiliariaId={contratos.find(c => c.id === selectedContratoId)?.inmobiliariaId || ""} 
+                onComprobanteChange={handleComprobanteChange}
+                comprobantePropietario={comprobantePropietario}
+                comprobanteInmobiliaria={comprobanteInmobiliaria}
+              />
               
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-slate-900">Completar el pago de {pendingPago.mes}</p>
                 <p className="mb-4 text-xs text-slate-500">
-                  Total a pagar: {formatCurrency(totalAPagar)}. Elegi el metodo que prefieras y, si usas transferencia, sube el comprobante
-                  para validarlo.
+                  Total a pagar: {formatCurrency(totalAPagar)}. Sube el comprobante de transferencia para validarlo.
                 </p>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button onClick={handleMercadoPago} className="sm:w-auto">
-                  Pagar con Mercado Pago
-                </Button>
-                <span className="text-xs text-slate-500">o carga el comprobante de transferencia</span>
-              </div>
               <form onSubmit={handleTransferSubmit} className="mt-4 grid gap-3" encType="multipart/form-data">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -453,9 +442,28 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
                     placeholder="Ej. Banco y referencia"
                   />
                 </div>
-                <Button type="submit" variant="outline" disabled={transferSubmitting}>
-                  {transferSubmitting ? "Enviando..." : "Enviar datos de transferencia"}
-                </Button>
+                <div className="space-y-2">
+                  {/* Indicador de comprobantes */}
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className={`flex items-center gap-2 ${comprobantePropietario ? 'text-green-600' : 'text-slate-400'}`}>
+                      <div className={`w-2 h-2 rounded-full ${comprobantePropietario ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                      <span>Comprobante Propietario {comprobantePropietario ? '✓' : '○'}</span>
+                    </div>
+                    <div className={`flex items-center gap-2 ${comprobanteInmobiliaria ? 'text-green-600' : 'text-slate-400'}`}>
+                      <div className={`w-2 h-2 rounded-full ${comprobanteInmobiliaria ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                      <span>Comprobante Inmobiliaria {comprobanteInmobiliaria ? '✓' : '○'}</span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    variant="outline" 
+                    disabled={transferSubmitting || (!comprobantePropietario && !comprobanteInmobiliaria)}
+                    className="w-full"
+                  >
+                    {transferSubmitting ? "Enviando..." : "Enviar datos de transferencia"}
+                  </Button>
+                </div>
               </form>
               </div>
             </div>

@@ -1,35 +1,36 @@
 import { redirect } from "next/navigation";
+import { OwnerDashboardWithSidebar } from "@/components/dashboard/OwnerDashboardWithSidebar";
+import { OWNER_SECTIONS, OwnerSection, getOwnerSectionsForRole } from "@/components/dashboard/owner/sections";
 import { serverApiFetch } from "@/lib/server-api";
 import { User, Contrato } from "@/lib/types";
 import { UserRole } from "@admin-inmo/shared";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { TenantDashboard } from "@/components/dashboard/TenantDashboard";
 
-export default async function DashboardPage() {
+interface OwnerSectionPageProps {
+  params: { section: string };
+}
+
+export default async function OwnerSectionPage({ params }: OwnerSectionPageProps) {
   let user: User;
   try {
     user = await serverApiFetch<User>("/api/auth/me");
-  } catch (_error) {
+  } catch (error) {
     redirect("/login");
   }
 
-  if (user.mustChangePassword) {
-    redirect("/change-password");
+  if (user.rol !== UserRole.PROPIETARIO) {
+    redirect("/dashboard");
   }
 
-  if (user.rol === UserRole.SUPER_ADMIN) {
-    redirect("/dashboard/super-admin");
-  }
+  const userSections = getOwnerSectionsForRole(user.rol);
+  const match = userSections.find((item) => item.id === params.section);
 
-  if (user.rol === UserRole.ADMIN) {
-    redirect("/dashboard/admin/overview");
-  }
-
-  if (user.rol === UserRole.PROPIETARIO) {
+  if (!match) {
     redirect("/dashboard/owner/overview");
   }
 
+  const activeSection: OwnerSection = match.id;
   const contratos = await serverApiFetch<Contrato[]>("/api/contratos");
 
   return (
@@ -39,7 +40,7 @@ export default async function DashboardPage() {
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold text-slate-900 dark:text-white">ADMIN INMO</h1>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {user.inmobiliaria?.nombre ? `Inmobiliaria ${user.inmobiliaria.nombre}` : "Panel personal"}
+              Panel de Propietario
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -55,11 +56,12 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="flex pt-20 md:pt-24">
-        <div className="flex-1 px-4 pb-12 md:px-8">
-          {user.rol === UserRole.INQUILINO && <TenantDashboard contratos={contratos} />}
-        </div>
-      </main>
+      <OwnerDashboardWithSidebar
+        activeSection={activeSection}
+        contratos={contratos}
+        propietarioId={user.id}
+        userRole={user.rol}
+      />
     </div>
   );
 }

@@ -202,7 +202,7 @@ const transferenciaSchema = z.object({
 export const registerTransferencia = async (
   pagoId: string,
   actor: AuthTokenPayload,
-  file: Express.Multer.File | null,
+  files: { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[] | undefined,
   body: unknown
 ) => {
   const pago = await getPagoById(pagoId, actor);
@@ -215,22 +215,41 @@ export const registerTransferencia = async (
     throw new HttpError(403, "Este comprobante no te pertenece");
   }
 
-  if (!file) {
-    throw new HttpError(400, "Debes subir una imagen del comprobante");
+  const parsed = transferenciaSchema.parse(body);
+
+  // Manejar upload dual
+  let comprobantePropietarioPath: string | undefined;
+  let comprobanteInmobiliariaPath: string | undefined;
+
+  if (files && typeof files === 'object' && !Array.isArray(files)) {
+    // Upload dual con campos separados
+    if (files.comprobantePropietario && files.comprobantePropietario[0]) {
+      comprobantePropietarioPath = files.comprobantePropietario[0].path;
+    }
+    if (files.comprobanteInmobiliaria && files.comprobanteInmobiliaria[0]) {
+      comprobanteInmobiliariaPath = files.comprobanteInmobiliaria[0].path;
+    }
+  } else if (files && Array.isArray(files) && files[0]) {
+    // Upload simple (legacy)
+    comprobantePropietarioPath = files[0].path;
   }
 
-  const parsed = transferenciaSchema.parse(body);
+  if (!comprobantePropietarioPath && !comprobanteInmobiliariaPath) {
+    throw new HttpError(400, "Debes subir al menos un comprobante");
+  }
 
   const transferencia = await prisma.transferencia.upsert({
     where: { pagoId },
     update: {
-      comprobantePath: file.path,
+      comprobantePropietarioPath,
+      comprobanteInmobiliariaPath,
       verificado: TransferenciaEstado.PENDIENTE_VERIFICACION,
       comentario: parsed.comentario,
     },
     create: {
       pagoId,
-      comprobantePath: file.path,
+      comprobantePropietarioPath,
+      comprobanteInmobiliariaPath,
       comentario: parsed.comentario,
     },
   });
@@ -246,13 +265,13 @@ export const listPagosByContrato = async (contratoId: string, actor: AuthTokenPa
   });
 };
 
-// Función para verificar una transferencia (solo SUPER_ADMIN)
+// Función para verificar un comprobante específico (SUPER_ADMIN, ADMIN, PROPIETARIO)
 export const verificarTransferencia = async (
   pagoId: string,
-  data: { verificado: boolean; comentario?: string },
+  data: { verificado: boolean; comentario?: string; tipoComprobante?: string },
   actor: AuthTokenPayload
 ) => {
-  if (actor.role !== UserRole.SUPER_ADMIN) {
+  if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.ADMIN && actor.role !== UserRole.PROPIETARIO) {
     throw new HttpError(403, "No tenés permisos para verificar transferencias");
   }
 
@@ -260,31 +279,109 @@ export const verificarTransferencia = async (
   
   const transferencia = await prisma.transferencia.findUnique({
     where: { pagoId },
-    include: { pago: { include: { contrato: { include: { inmobiliaria: true } } } } }
+    include: { 
+      pago: { include: { contrato: { include: { inmobiliaria: true } } } },
+      verificaciones: { include: { verificadoPor: true } }
+    }
   });
 
   if (!transferencia) {
     throw new HttpError(404, "Transferencia no encontrada");
   }
 
-  const nuevoEstado = data.verificado ? TransferenciaEstado.VERIFICADO : TransferenciaEstado.RECHAZADO;
+  // Determinar qué tipo de comprobante puede verificar el usuario
+  let tipoComprobante: string;
+  if (actor.role === UserRole.ADMIN) {
+    // ADMIN solo puede verificar comprobante de inmobiliaria
+    tipoComprobante = "INMOBILIARIA";
+    if (actor.inmobiliariaId && transferencia.pago.contrato.inmobiliariaId !== actor.inmobiliariaId) {
+      throw new HttpError(403, "No tienes acceso a esta transferencia");
+    }
+  } else if (actor.role === UserRole.PROPIETARIO) {
+    // PROPIETARIO solo puede verificar su comprobante
+    tipoComprobante = "PROPIETARIO";
+    if (transferencia.pago.contrato.propietarioId !== actor.id) {
+      throw new HttpError(403, "No tienes acceso a esta transferencia");
+    }
+  } else {
+    // SUPER_ADMIN puede verificar cualquier comprobante
+    if (!data.tipoComprobante) {
+      throw new HttpError(400, "Debes especificar el tipo de comprobante a verificar");
+    }
+    tipoComprobante = data.tipoComprobante;
+  }
 
-  const transferenciaActualizada = await prisma.transferencia.update({
-    where: { pagoId },
-    data: {
-      verificado: nuevoEstado,
+  // Verificar que el comprobante existe
+  if (tipoComprobante === "PROPIETARIO" && !transferencia.comprobantePropietarioPath) {
+    throw new HttpError(400, "No existe comprobante del propietario para verificar");
+  }
+  if (tipoComprobante === "INMOBILIARIA" && !transferencia.comprobanteInmobiliariaPath) {
+    throw new HttpError(400, "No existe comprobante de la inmobiliaria para verificar");
+  }
+
+  // Crear o actualizar la verificación del comprobante
+  const verificacion = await prisma.verificacionComprobante.upsert({
+    where: {
+      transferenciaId_tipoComprobante: {
+        transferenciaId: transferencia.id,
+        tipoComprobante: tipoComprobante as any
+      }
+    },
+    update: {
+      verificado: data.verificado,
       verificadoPorId: actor.id,
       verificadoAt: new Date(),
       comentario: data.comentario,
     },
+    create: {
+      transferenciaId: transferencia.id,
+      tipoComprobante: tipoComprobante as any,
+      verificado: data.verificado,
+      verificadoPorId: actor.id,
+      comentario: data.comentario,
+    },
   });
 
-  // If approved, mark the payment as approved
-  if (data.verificado) {
+  // Verificar si ambos comprobantes están aprobados para cambiar el estado general
+  const verificaciones = await prisma.verificacionComprobante.findMany({
+    where: { transferenciaId: transferencia.id }
+  });
+
+  const comprobantePropietarioVerificado = verificaciones.find(v => v.tipoComprobante === "PROPIETARIO" && v.verificado);
+  const comprobanteInmobiliariaVerificado = verificaciones.find(v => v.tipoComprobante === "INMOBILIARIA" && v.verificado);
+
+  let nuevoEstadoGeneral: string;
+  if (data.verificado === false) {
+    // Si se rechaza cualquier comprobante, la transferencia se rechaza
+    nuevoEstadoGeneral = TransferenciaEstado.RECHAZADO;
+  } else if (comprobantePropietarioVerificado && comprobanteInmobiliariaVerificado) {
+    // Si ambos comprobantes están aprobados, la transferencia se aprueba
+    nuevoEstadoGeneral = TransferenciaEstado.APROBADO;
+  } else {
+    // Si solo uno está aprobado, sigue pendiente
+    nuevoEstadoGeneral = TransferenciaEstado.PENDIENTE_VERIFICACION;
+  }
+
+  // Actualizar el estado general de la transferencia
+  const transferenciaActualizada = await prisma.transferencia.update({
+    where: { pagoId },
+    data: {
+      verificado: nuevoEstadoGeneral as any,
+      verificadoPorId: actor.id,
+      verificadoAt: new Date(),
+      comentario: data.comentario,
+    },
+    include: {
+      verificaciones: { include: { verificadoPor: true } }
+    }
+  });
+
+  // If fully approved, mark the payment as approved
+  if (nuevoEstadoGeneral === TransferenciaEstado.APROBADO) {
     await markPagoAsApproved(pagoId, { metodo: PagoMetodo.TRANSFERENCIA });
     // Notificar a todas las partes
     await notifyPagoApproved(pagoId);
-  } else {
+  } else if (nuevoEstadoGeneral === TransferenciaEstado.RECHAZADO) {
     // Notificar rechazo
     await notifyPagoRejected(pagoId, data.comentario);
   }
@@ -295,7 +392,7 @@ export const verificarTransferencia = async (
   return transferenciaActualizada;
 };
 
-// Función para ejecutar transferencias manuales (solo SUPER_ADMIN)
+// Función para ejecutar transferencias manuales (SUPER_ADMIN y ADMIN)
 // Función para calcular la división de montos
 export const calcularDivisionMontos = async (pagoId: string) => {
   const pago = await prisma.pago.findUnique({
@@ -354,7 +451,7 @@ export const ejecutarTransferenciasManuales = async (
   },
   actor: AuthTokenPayload
 ) => {
-  if (actor.role !== UserRole.SUPER_ADMIN) {
+  if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.ADMIN) {
     throw new HttpError(403, "No tenés permisos para ejecutar transferencias");
   }
 
@@ -367,6 +464,15 @@ export const ejecutarTransferenciasManuales = async (
 
   if (!transferencia) {
     throw new HttpError(404, "Transferencia no encontrada");
+  }
+
+  // Verificar que el ADMIN solo puede ejecutar transferencias de su inmobiliaria
+  if (
+    actor.role === UserRole.ADMIN &&
+    actor.inmobiliariaId &&
+    transferencia.pago.contrato.inmobiliariaId !== actor.inmobiliariaId
+  ) {
+    throw new HttpError(403, "No tienes acceso a esta transferencia");
   }
 
   if (transferencia.verificado !== TransferenciaEstado.VERIFICADO) {
@@ -399,10 +505,19 @@ export const ejecutarTransferenciasManuales = async (
   };
 };
 
-// Función para obtener transferencias pendientes de verificación (solo SUPER_ADMIN)
+// Función para obtener transferencias pendientes de verificación (SUPER_ADMIN y ADMIN)
 export const listTransferenciasPendientes = async (inmobiliariaId: string, actor: AuthTokenPayload) => {
-  if (actor.role !== UserRole.SUPER_ADMIN) {
+  if (actor.role !== UserRole.SUPER_ADMIN && actor.role !== UserRole.ADMIN) {
     throw new HttpError(403, "No tenés permisos para ver transferencias pendientes");
+  }
+
+  // Verificar que el ADMIN solo puede ver transferencias de su inmobiliaria
+  if (
+    actor.role === UserRole.ADMIN &&
+    actor.inmobiliariaId &&
+    inmobiliariaId !== actor.inmobiliariaId
+  ) {
+    throw new HttpError(403, "No tienes acceso a transferencias de esta inmobiliaria");
   }
 
   const whereClause: any = {
@@ -426,6 +541,11 @@ export const listTransferenciasPendientes = async (inmobiliariaId: string, actor
               inquilino: true,
             }
           }
+        }
+      },
+      verificaciones: {
+        include: {
+          verificadoPor: true
         }
       }
     },
@@ -461,6 +581,47 @@ export const listTransferenciasInmobiliaria = async (actor: AuthTokenPayload) =>
               inquilino: true,
             }
           }
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+};
+
+// Función para que PROPIETARIO vea sus transferencias
+export const listTransferenciasPropietario = async (propietarioId: string, actor: AuthTokenPayload) => {
+  if (actor.role !== UserRole.PROPIETARIO) {
+    throw new HttpError(403, "Solo los propietarios pueden ver estas transferencias");
+  }
+
+  // Verificar que el propietario solo puede ver sus propias transferencias
+  if (actor.id !== propietarioId) {
+    throw new HttpError(403, "No tienes acceso a estas transferencias");
+  }
+
+  return prisma.transferencia.findMany({
+    where: {
+      pago: {
+        contrato: {
+          propietarioId: propietarioId,
+        }
+      }
+    },
+    include: {
+      pago: {
+        include: {
+          contrato: {
+            include: {
+              inmobiliaria: true,
+              propietario: true,
+              inquilino: true,
+            }
+          }
+        }
+      },
+      verificaciones: {
+        include: {
+          verificadoPor: true
         }
       }
     },

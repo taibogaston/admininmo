@@ -70,6 +70,13 @@ enum AuditAction {
   FILE_DELETE
   CONFIG_UPDATE
   SYSTEM_ACCESS
+  COMPROBANTES_LIST
+  COMPROBANTE_VIEW
+  COMPROBANTE_UPLOAD
+  COMPROBANTE_APPROVE
+  COMPROBANTE_REJECT
+  CBU_CONFIG_VIEW
+  CBU_CONFIG_UPDATE
 }
 
 model User {
@@ -91,6 +98,7 @@ model User {
   contratosPropietario Contrato[] @relation("PropietarioContratos")
   contratosInquilino   Contrato[] @relation("InquilinoContratos")
   transferenciasVerificadas Transferencia[] @relation("VerificadorTransferencias")
+  comprobantesVerificados VerificacionComprobante[] @relation("VerificadorComprobantes")
   descuentosSolicitados Descuento[] @relation("InquilinoDescuentos")
   auditLogs AuditLog[]
 
@@ -182,7 +190,8 @@ model Transferencia {
   id               String              @id @default(cuid())
   pago             Pago                @relation(fields: [pagoId], references: [id])
   pagoId           String              @unique
-  comprobantePath  String?             // Solo la imagen del comprobante
+  comprobantePropietarioPath String?   // Comprobante de pago al propietario
+  comprobanteInmobiliariaPath String?  // Comprobante de pago a la inmobiliaria
   verificado       TransferenciaEstado @default(PENDIENTE_VERIFICACION)
   verificadoPor    User?               @relation("VerificadorTransferencias", fields: [verificadoPorId], references: [id])
   verificadoPorId  String?
@@ -194,7 +203,32 @@ model Transferencia {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
+  // Verificaciones individuales de comprobantes
+  verificaciones   VerificacionComprobante[]
+
   @@index([verificado])
+}
+
+model VerificacionComprobante {
+  id               String              @id @default(cuid())
+  transferencia    Transferencia       @relation(fields: [transferenciaId], references: [id])
+  transferenciaId  String
+  tipoComprobante  TipoComprobante     // PROPIETARIO o INMOBILIARIA
+  verificado       Boolean             // true = aprobado, false = rechazado
+  verificadoPor    User                @relation("VerificadorComprobantes", fields: [verificadoPorId], references: [id])
+  verificadoPorId  String
+  verificadoAt     DateTime            @default(now())
+  comentario       String?
+  createdAt        DateTime            @default(now())
+
+  @@unique([transferenciaId, tipoComprobante])
+  @@index([transferenciaId])
+  @@index([verificadoPorId])
+}
+
+enum TipoComprobante {
+  PROPIETARIO
+  INMOBILIARIA
 }
 
 model Descuento {
@@ -222,10 +256,24 @@ model Inmobiliaria {
   updatedAt         DateTime  @updatedAt
   usuarios          User[]
   contratos         Contrato[]
-  configuracionPagos ConfiguracionPagos?
+  configuracionPagosInmobiliaria ConfiguracionPagosInmobiliaria?
+  configuracionPagosPropietario ConfiguracionPagosPropietario?
 }
 
-model ConfiguracionPagos {
+model ConfiguracionPagosInmobiliaria {
+  id               String      @id @default(cuid())
+  inmobiliaria     Inmobiliaria @relation(fields: [inmobiliariaId], references: [id])
+  inmobiliariaId   String      @unique
+  cbuDestino       String
+  aliasCbu         String?
+  banco            String?
+  qrCode           String?     // Base64 del QR o URL
+  activo           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model ConfiguracionPagosPropietario {
   id               String      @id @default(cuid())
   inmobiliaria     Inmobiliaria @relation(fields: [inmobiliariaId], references: [id])
   inmobiliariaId   String      @unique

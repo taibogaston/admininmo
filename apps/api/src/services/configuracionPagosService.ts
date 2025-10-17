@@ -19,7 +19,25 @@ const configuracionSchema = z.object({
   }).default(3.0),
 });
 
+const configuracionInmobiliariaSchema = z.object({
+  cbuDestino: z.string().min(20).max(22),
+  aliasCbu: z.string().max(50).optional(),
+  banco: z.string().max(100).optional(),
+  qrCode: z.string().optional(),
+  activo: z.boolean().default(true),
+});
+
+const configuracionPropietarioSchema = z.object({
+  cbuDestino: z.string().min(20).max(22),
+  aliasCbu: z.string().max(50).optional(),
+  banco: z.string().max(100).optional(),
+  qrCode: z.string().optional(),
+  activo: z.boolean().default(true),
+});
+
 type ConfiguracionInput = z.infer<typeof configuracionSchema>;
+type ConfiguracionInmobiliariaInput = z.infer<typeof configuracionInmobiliariaSchema>;
+type ConfiguracionPropietarioInput = z.infer<typeof configuracionPropietarioSchema>;
 
 export const getConfiguracionPagos = async (inmobiliariaId: string, actor: AuthTokenPayload) => {
   if (![UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(actor.role)) {
@@ -28,7 +46,10 @@ export const getConfiguracionPagos = async (inmobiliariaId: string, actor: AuthT
 
   const inmobiliaria = await prisma.inmobiliaria.findUnique({
     where: { id: inmobiliariaId },
-    include: { configuracionPagos: true },
+    include: { 
+      configuracionPagosInmobiliaria: true,
+      configuracionPagosPropietario: true 
+    },
   });
 
   if (!inmobiliaria) {
@@ -41,7 +62,8 @@ export const getConfiguracionPagos = async (inmobiliariaId: string, actor: AuthT
   }
 
   return {
-    ...inmobiliaria.configuracionPagos,
+    inmobiliaria: inmobiliaria.configuracionPagosInmobiliaria,
+    propietario: inmobiliaria.configuracionPagosPropietario,
     porcentajeComision: inmobiliaria.porcentajeComision,
   };
 };
@@ -76,7 +98,99 @@ export const createOrUpdateConfiguracionPagos = async (
     data: { porcentajeComision: parsed.porcentajeComision },
   });
 
-  const configuracion = await prisma.configuracionPagos.upsert({
+  const configuracion = await prisma.configuracionPagosInmobiliaria.upsert({
+    where: { inmobiliariaId },
+    update: {
+      cbuDestino: parsed.cbuDestino,
+      aliasCbu: parsed.aliasCbu,
+      banco: parsed.banco,
+      qrCode: parsed.qrCode,
+      activo: parsed.activo,
+    },
+    create: {
+      inmobiliariaId,
+      cbuDestino: parsed.cbuDestino,
+      aliasCbu: parsed.aliasCbu,
+      banco: parsed.banco,
+      qrCode: parsed.qrCode,
+      activo: parsed.activo,
+    },
+  });
+
+  return configuracion;
+};
+
+export const createOrUpdateConfiguracionPagosInmobiliaria = async (
+  inmobiliariaId: string,
+  data: unknown,
+  actor: AuthTokenPayload
+) => {
+  if (actor.role !== UserRole.ADMIN) {
+    throw new HttpError(403, "Solo los administradores pueden configurar pagos");
+  }
+
+  const inmobiliaria = await prisma.inmobiliaria.findUnique({
+    where: { id: inmobiliariaId },
+  });
+
+  if (!inmobiliaria) {
+    throw new HttpError(404, "Inmobiliaria no encontrada");
+  }
+
+  // Verificar que el usuario pertenece a esta inmobiliaria
+  if (actor.inmobiliariaId !== inmobiliariaId) {
+    throw new HttpError(403, "No tenés permisos para configurar esta inmobiliaria");
+  }
+
+  const parsed: ConfiguracionInmobiliariaInput = configuracionInmobiliariaSchema.parse(data);
+
+  const configuracion = await prisma.configuracionPagosInmobiliaria.upsert({
+    where: { inmobiliariaId },
+    update: {
+      cbuDestino: parsed.cbuDestino,
+      aliasCbu: parsed.aliasCbu,
+      banco: parsed.banco,
+      qrCode: parsed.qrCode,
+      activo: parsed.activo,
+    },
+    create: {
+      inmobiliariaId,
+      cbuDestino: parsed.cbuDestino,
+      aliasCbu: parsed.aliasCbu,
+      banco: parsed.banco,
+      qrCode: parsed.qrCode,
+      activo: parsed.activo,
+    },
+  });
+
+  return configuracion;
+};
+
+export const createOrUpdateConfiguracionPagosPropietario = async (
+  inmobiliariaId: string,
+  data: unknown,
+  actor: AuthTokenPayload
+) => {
+  if (actor.role !== UserRole.ADMIN) {
+    throw new HttpError(403, "Solo los administradores pueden configurar pagos");
+  }
+
+  const inmobiliaria = await prisma.inmobiliaria.findUnique({
+    where: { id: inmobiliariaId },
+  });
+
+  if (!inmobiliaria) {
+    throw new HttpError(404, "Inmobiliaria no encontrada");
+  }
+
+  // Verificar que el usuario pertenece a esta inmobiliaria
+  if (actor.inmobiliariaId !== inmobiliariaId) {
+    throw new HttpError(403, "No tenés permisos para configurar esta inmobiliaria");
+  }
+
+  const parsed: ConfiguracionPropietarioInput = configuracionPropietarioSchema.parse(data);
+
+  const configuracion = await prisma.configuracionPagosPropietario.upsert({
     where: { inmobiliariaId },
     update: {
       cbuDestino: parsed.cbuDestino,
@@ -101,18 +215,37 @@ export const createOrUpdateConfiguracionPagos = async (
 export const getConfiguracionPagosPublica = async (inmobiliariaId: string) => {
   const inmobiliaria = await prisma.inmobiliaria.findUnique({
     where: { id: inmobiliariaId },
-    include: { configuracionPagos: true },
+    include: { 
+      configuracionPagosInmobiliaria: true,
+      configuracionPagosPropietario: true 
+    },
   });
 
-  if (!inmobiliaria?.configuracionPagos?.activo) {
+  if (!inmobiliaria) {
+    throw new HttpError(404, "Inmobiliaria no encontrada");
+  }
+
+  // Verificar que al menos una configuración esté activa
+  const inmobiliariaActiva = inmobiliaria.configuracionPagosInmobiliaria?.activo;
+  const propietarioActivo = inmobiliaria.configuracionPagosPropietario?.activo;
+
+  if (!inmobiliariaActiva && !propietarioActivo) {
     throw new HttpError(404, "Configuración de pagos no disponible");
   }
 
   // Solo devolver datos públicos necesarios para el pago
   return {
-    cbuDestino: inmobiliaria.configuracionPagos.cbuDestino,
-    aliasCbu: inmobiliaria.configuracionPagos.aliasCbu,
-    banco: inmobiliaria.configuracionPagos.banco,
-    qrCode: inmobiliaria.configuracionPagos.qrCode,
+    inmobiliaria: inmobiliaria.configuracionPagosInmobiliaria?.activo ? {
+      cbuDestino: inmobiliaria.configuracionPagosInmobiliaria.cbuDestino,
+      aliasCbu: inmobiliaria.configuracionPagosInmobiliaria.aliasCbu,
+      banco: inmobiliaria.configuracionPagosInmobiliaria.banco,
+      qrCode: inmobiliaria.configuracionPagosInmobiliaria.qrCode,
+    } : null,
+    propietario: inmobiliaria.configuracionPagosPropietario?.activo ? {
+      cbuDestino: inmobiliaria.configuracionPagosPropietario.cbuDestino,
+      aliasCbu: inmobiliaria.configuracionPagosPropietario.aliasCbu,
+      banco: inmobiliaria.configuracionPagosPropietario.banco,
+      qrCode: inmobiliaria.configuracionPagosPropietario.qrCode,
+    } : null,
   };
 };

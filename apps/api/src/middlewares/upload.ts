@@ -45,3 +45,12 @@ export const transferenciaUpload = multer({
   fileFilter,
   limits: { fileSize: 15 * 1024 * 1024 },
 });
+
+export const transferenciaDualUpload = multer({
+  storage: makeStorage("proofs", "pagoId"),
+  fileFilter,
+  limits: { fileSize: 15 * 1024 * 1024 },
+}).fields([
+  { name: 'comprobantePropietario', maxCount: 1 },
+  { name: 'comprobanteInmobiliaria', maxCount: 1 }
+]);
