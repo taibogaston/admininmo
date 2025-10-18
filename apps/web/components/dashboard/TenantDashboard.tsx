@@ -404,6 +404,9 @@ export const TenantDashboard = ({ contratos }: TenantDashboardProps) => {
             comprobanteInmobiliaria={comprobanteInmobiliaria}
             onSubmitComprobante={handleSubmitComprobante}
             isSubmitting={transferSubmitting}
+            verificaciones={(pendingPago && 'transferencia' in pendingPago) ? pendingPago.transferencia?.verificaciones : undefined}
+            comprobantePropietarioEnviado={!!(pendingPago && 'transferencia' in pendingPago && pendingPago.transferencia?.comprobantePropietarioPath)}
+            comprobanteInmobiliariaEnviado={!!(pendingPago && 'transferencia' in pendingPago && pendingPago.transferencia?.comprobanteInmobiliariaPath)}
           />
         </section>
       )}

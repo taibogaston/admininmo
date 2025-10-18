@@ -284,6 +284,13 @@ export const getContratoPagos = async (contratoId: string, actor: AuthTokenPaylo
   await assertContratoAccess(contratoId, actor);
   return prisma.pago.findMany({
     where: { contratoId },
+    include: {
+      transferencia: {
+        include: {
+          verificaciones: true,
+        },
+      },
+    },
     orderBy: { mes: "desc" },
   });
 };

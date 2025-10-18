@@ -30,6 +30,14 @@ export interface ContratoArchivo {
   uploadedAt: string;
 }
 
+export interface VerificacionComprobante {
+  id: string;
+  tipoComprobante: string;
+  verificado: boolean;
+  comentario?: string;
+  verificadoAt: string;
+}
+
 export interface Pago {
   id: string;
   contratoId: string;
@@ -39,6 +47,13 @@ export interface Pago {
   fechaPago?: string;
   metodoPago?: PagoMetodo;
   externalId: string;
+  transferencia?: {
+    id: string;
+    verificado: TransferenciaEstado;
+    comprobantePropietarioPath?: string;
+    comprobanteInmobiliariaPath?: string;
+    verificaciones?: VerificacionComprobante[];
+  };
 }
 
 export interface Movimiento {

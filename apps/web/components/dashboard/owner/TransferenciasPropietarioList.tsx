@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { clientApiFetch } from "@/lib/client-api";
 import { toast } from "@/lib/toast";
 import { TransferenciaManual, TransferenciaEstado, UserRole } from "@admin-inmo/shared";
@@ -69,21 +71,21 @@ interface TransferenciaCompleta {
   };
 }
 
-export const TransferenciasPropietarioList = ({ propietarioId, userRole }: TransferenciasPropietarioListProps) => {
+export function TransferenciasPropietarioList({ propietarioId, userRole }: TransferenciasPropietarioListProps) {
   const [transferencias, setTransferencias] = useState<TransferenciaCompleta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [verificando, setVerificando] = useState<string | null>(null);
-  const [comentarios, setComentarios] = useState<Record<string, string>>({});
+  const [verificandoComprobante, setVerificandoComprobante] = useState<{ transferenciaId: string; tipo: string } | null>(null);
+  const [comentarioRechazo, setComentarioRechazo] = useState("");
+  const [rechazandoComprobante, setRechazandoComprobante] = useState<{ transferenciaId: string; tipo: string } | null>(null);
 
   useEffect(() => {
     loadTransferencias();
-  }, [propietarioId]);
+  }, []);
 
-  const loadTransferencias = async () => {
+  async function loadTransferencias() {
     try {
       setLoading(true);
-      // El propietario solo ve transferencias donde él es el propietario
-      const response = await clientApiFetch(`/api/pagos/transferencias-propietario/${propietarioId}`);
+      const response = await clientApiFetch(`/api/transferencias/pendientes`);
       setTransferencias((response as TransferenciaCompleta[]) || []);
     } catch (error) {
       console.error("Error cargando transferencias:", error);
@@ -91,31 +93,67 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleVerificar = async (pagoId: string, verificado: boolean) => {
+  async function handleVerificarComprobante(transferenciaId: string, tipo: string, aprobar: boolean) {
+    if (!aprobar) {
+      setRechazandoComprobante({ transferenciaId, tipo });
+      return;
+    }
+
     try {
-      setVerificando(pagoId);
-      await clientApiFetch(`/api/pagos/${pagoId}/verificar`, {
+      setVerificandoComprobante({ transferenciaId, tipo });
+      await clientApiFetch(`/api/transferencias/${transferenciaId}/verificar-comprobante/${tipo}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          verificado,
-          comentario: comentarios[pagoId] || undefined,
+          aprobar: true,
         }),
       });
       
-      toast.success(verificado ? "Transferencia verificada" : "Transferencia rechazada");
+      toast.success("Tu comprobante ha sido aprobado");
       await loadTransferencias();
-    } catch (error) {
-      console.error("Error verificando transferencia:", error);
-      toast.error("Error al verificar la transferencia");
+    } catch (error: any) {
+      console.error("Error verificando comprobante:", error);
+      toast.error(error.message || "Error al verificar el comprobante");
     } finally {
-      setVerificando(null);
+      setVerificandoComprobante(null);
     }
-  };
+  }
 
-  const formatDate = (dateString: string) => {
+  async function handleRechazarComprobante() {
+    if (!rechazandoComprobante) return;
+    
+    if (!comentarioRechazo.trim()) {
+      toast.error("Debes proporcionar un motivo para rechazar el comprobante");
+      return;
+    }
+
+    try {
+      const { transferenciaId, tipo } = rechazandoComprobante;
+      setVerificandoComprobante({ transferenciaId, tipo });
+      await clientApiFetch(`/api/transferencias/${transferenciaId}/verificar-comprobante/${tipo}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aprobar: false,
+          comentario: comentarioRechazo.trim(),
+        }),
+      });
+      
+      toast.success("Comprobante rechazado");
+      setRechazandoComprobante(null);
+      setComentarioRechazo("");
+      await loadTransferencias();
+    } catch (error: any) {
+      console.error("Error rechazando comprobante:", error);
+      toast.error(error.message || "Error al rechazar el comprobante");
+    } finally {
+      setVerificandoComprobante(null);
+    }
+  }
+
+  function formatDate(dateString: string) {
     return new Date(dateString).toLocaleDateString("es-AR", {
       year: "numeric",
       month: "short",
@@ -123,16 +161,16 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }
 
-  const formatCurrency = (amount: number) => {
+  function formatCurrency(amount: number) {
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
     }).format(amount);
-  };
+  }
 
-  const getEstadoBadge = (estado: TransferenciaEstado) => {
+  function getEstadoBadge(estado: TransferenciaEstado) {
     const labels = {
       [TransferenciaEstado.PENDIENTE_VERIFICACION]: "PENDIENTE",
       [TransferenciaEstado.VERIFICADO]: "VERIFICADO",
@@ -141,17 +179,17 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
     };
 
     return <StatusBadge status={labels[estado]} />;
-  };
+  }
 
-  const getVerificacionComprobante = (transferencia: TransferenciaCompleta, tipo: string) => {
-    return transferencia.verificaciones?.find(v => v.tipoComprobante === tipo);
-  };
+  function getVerificacionComprobante(transferencia: TransferenciaCompleta, tipo: string) {
+    return transferencia.verificaciones?.find((v) => v.tipoComprobante === tipo);
+  }
 
-  const getEstadoComprobante = (transferencia: TransferenciaCompleta, tipo: string) => {
+  function getEstadoComprobante(transferencia: TransferenciaCompleta, tipo: string) {
     const verificacion = getVerificacionComprobante(transferencia, tipo);
     if (!verificacion) return "PENDIENTE";
     return verificacion.verificado ? "APROBADO" : "RECHAZADO";
-  };
+  }
 
   if (loading) {
     return (
@@ -224,14 +262,12 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
                 </div>
               </div>
 
-              {/* Solo muestra el comprobante del propietario */}
               <div className="space-y-3">
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Comprobante:
                 </p>
                 
                 <div className="grid grid-cols-1 gap-3">
-                  {/* Comprobante del Propietario */}
                   {transferencia.comprobantePropietarioPath && (
                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
@@ -243,26 +279,56 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
                         </div>
                         <StatusBadge status={getEstadoComprobante(transferencia, "PROPIETARIO")} />
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/transferencias/${transferencia.id}/comprobante-propietario`, '_blank')}
-                        className="w-full"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Ver Mi Comprobante
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/transferencias/${transferencia.id}/comprobante-propietario`, '_blank')}
+                          className="w-full"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver Mi Comprobante
+                        </Button>
+                        
+                        {!getVerificacionComprobante(transferencia, "PROPIETARIO") && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleVerificarComprobante(transferencia.id, "PROPIETARIO", true)}
+                              disabled={verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "PROPIETARIO"}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              {verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "PROPIETARIO" ? "..." : "Aprobar"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleVerificarComprobante(transferencia.id, "PROPIETARIO", false)}
+                              disabled={verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "PROPIETARIO"}
+                              variant="outline"
+                              className="flex-1 border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Rechazar
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
                       {getVerificacionComprobante(transferencia, "PROPIETARIO") && (
                         <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-                          Verificado por: {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.nombre} {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.apellido}
-                          <br />
-                          {new Date(getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoAt || '').toLocaleDateString("es-AR")}
+                          <div>Verificado por: {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.nombre} {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.apellido}</div>
+                          <div>{new Date(getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoAt || '').toLocaleDateString("es-AR")}</div>
+                          {getVerificacionComprobante(transferencia, "PROPIETARIO")?.comentario && (
+                            <div className="mt-1 p-2 bg-slate-100 dark:bg-slate-700 rounded text-xs">
+                              <strong>Motivo:</strong> {getVerificacionComprobante(transferencia, "PROPIETARIO")?.comentario}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Comprobante legacy (para compatibilidad) */}
                   {transferencia.comprobantePath && !transferencia.comprobantePropietarioPath && (
                     <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
@@ -302,54 +368,6 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
                 </p>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Comentarios:
-                </label>
-                <Textarea
-                  value={comentarios[transferencia.pagoId] || ""}
-                  onChange={(e) => setComentarios(prev => ({
-                    ...prev,
-                    [transferencia.pagoId]: e.target.value,
-                  }))}
-                  placeholder="Agregar comentarios..."
-                  rows={2}
-                  className="mt-1"
-                />
-              </div>
-
-              {transferencia.verificado === TransferenciaEstado.PENDIENTE_VERIFICACION && (
-                <div>
-                  {transferencia.comprobantePropietarioPath && getEstadoComprobante(transferencia, "PROPIETARIO") === "PENDIENTE" ? (
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleVerificar(transferencia.pagoId, true)}
-                        disabled={verificando === transferencia.pagoId}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        {verificando === transferencia.pagoId ? "Verificando..." : "Verificar Mi Comprobante"}
-                      </Button>
-                      <Button
-                        onClick={() => handleVerificar(transferencia.pagoId, false)}
-                        disabled={verificando === transferencia.pagoId}
-                        variant="outline"
-                        className="border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Rechazar
-                      </Button>
-                    </div>
-                  ) : !transferencia.comprobantePropietarioPath ? (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        ⚠️ No se puede verificar: falta tu comprobante
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
               <div className="text-xs text-slate-500">
                 Subido: {formatDate(transferencia.createdAt)}
                 {transferencia.verificadoAt && (
@@ -360,6 +378,51 @@ export const TransferenciasPropietarioList = ({ propietarioId, userRole }: Trans
           </Card>
         ))}
       </div>
+
+      <Dialog open={rechazandoComprobante !== null} onOpenChange={(open) => !open && setRechazandoComprobante(null)}>
+        <DialogContent onClose={() => setRechazandoComprobante(null)}>
+          <DialogHeader>
+            <DialogTitle>Rechazar Comprobante</DialogTitle>
+            <DialogDescription>
+              Debes proporcionar un motivo para rechazar tu comprobante
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogBody>
+            <div className="space-y-2">
+              <Label htmlFor="comentario-rechazo">Motivo del rechazo</Label>
+              <Textarea
+                id="comentario-rechazo"
+                value={comentarioRechazo}
+                onChange={(e) => setComentarioRechazo(e.target.value)}
+                placeholder="Ej: El comprobante tiene un error en el monto"
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </DialogBody>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRechazandoComprobante(null);
+                setComentarioRechazo("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRechazarComprobante}
+              disabled={!comentarioRechazo.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Rechazar Comprobante
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-};
+}
+

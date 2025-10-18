@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { clientApiFetch } from "@/lib/client-api";
 import { toast } from "@/lib/toast";
 import { TransferenciaManual, TransferenciaEstado, UserRole } from "@admin-inmo/shared";
@@ -72,6 +75,9 @@ export const TransferenciasPendientesList = ({ inmobiliariaId, userRole }: Trans
   const [transferencias, setTransferencias] = useState<TransferenciaCompleta[]>([]);
   const [loading, setLoading] = useState(true);
   const [verificando, setVerificando] = useState<string | null>(null);
+  const [verificandoComprobante, setVerificandoComprobante] = useState<{ transferenciaId: string; tipo: string } | null>(null);
+  const [comentarioRechazo, setComentarioRechazo] = useState("");
+  const [rechazandoComprobante, setRechazandoComprobante] = useState<{ transferenciaId: string; tipo: string } | null>(null);
   const [ejecutando, setEjecutando] = useState<string | null>(null);
   const [comentarios, setComentarios] = useState<Record<string, string>>({});
   const [transferenciaIds, setTransferenciaIds] = useState<Record<string, {
@@ -115,6 +121,65 @@ export const TransferenciasPendientesList = ({ inmobiliariaId, userRole }: Trans
       toast.error("Error al verificar la transferencia");
     } finally {
       setVerificando(null);
+    }
+  };
+
+  const handleVerificarComprobante = async (transferenciaId: string, tipo: string, aprobar: boolean) => {
+    if (!aprobar) {
+      // Si está rechazando, abrir modal para solicitar comentario
+      setRechazandoComprobante({ transferenciaId, tipo });
+      return;
+    }
+
+    try {
+      setVerificandoComprobante({ transferenciaId, tipo });
+      await clientApiFetch(`/api/transferencias/${transferenciaId}/verificar-comprobante/${tipo}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aprobar: true,
+        }),
+      });
+      
+      toast.success(`Comprobante de ${tipo === "PROPIETARIO" ? "Propietario" : "Inmobiliaria"} aprobado`);
+      await loadTransferencias();
+    } catch (error: any) {
+      console.error("Error verificando comprobante:", error);
+      toast.error(error.message || "Error al verificar el comprobante");
+    } finally {
+      setVerificandoComprobante(null);
+    }
+  };
+
+  const handleRechazarComprobante = async () => {
+    if (!rechazandoComprobante) return;
+    
+    if (!comentarioRechazo.trim()) {
+      toast.error("Debes proporcionar un motivo para rechazar el comprobante");
+      return;
+    }
+
+    try {
+      const { transferenciaId, tipo } = rechazandoComprobante;
+      setVerificandoComprobante({ transferenciaId, tipo });
+      await clientApiFetch(`/api/transferencias/${transferenciaId}/verificar-comprobante/${tipo}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aprobar: false,
+          comentario: comentarioRechazo.trim(),
+        }),
+      });
+      
+      toast.success(`Comprobante de ${tipo === "PROPIETARIO" ? "Propietario" : "Inmobiliaria"} rechazado`);
+      setRechazandoComprobante(null);
+      setComentarioRechazo("");
+      await loadTransferencias();
+    } catch (error: any) {
+      console.error("Error rechazando comprobante:", error);
+      toast.error(error.message || "Error al rechazar el comprobante");
+    } finally {
+      setVerificandoComprobante(null);
     }
   };
 
@@ -269,23 +334,68 @@ export const TransferenciasPendientesList = ({ inmobiliariaId, userRole }: Trans
                           <span className="text-sm font-medium text-green-800 dark:text-green-200">
                             Comprobante Propietario
                           </span>
+                          {/* Indicador de actualización reciente */}
+                          {transferencia.updatedAt && new Date(transferencia.updatedAt).getTime() > new Date(transferencia.createdAt).getTime() + 10000 && (
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
+                              Actualizado
+                            </span>
+                          )}
                         </div>
                         <StatusBadge status={getEstadoComprobante(transferencia, "PROPIETARIO")} />
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/transferencias/${transferencia.id}/comprobante-propietario`, '_blank')}
-                        className="w-full"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Ver Comprobante
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/transferencias/${transferencia.id}/comprobante-propietario`, '_blank')}
+                          className="w-full"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver Comprobante
+                        </Button>
+                        
+                        {/* Botones de aprobación/rechazo - Solo PROPIETARIO y SUPER_ADMIN pueden verificar comprobante del propietario */}
+                        {!getVerificacionComprobante(transferencia, "PROPIETARIO") && (userRole === UserRole.PROPIETARIO || userRole === UserRole.SUPER_ADMIN) && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleVerificarComprobante(transferencia.id, "PROPIETARIO", true)}
+                              disabled={verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "PROPIETARIO"}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              {verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "PROPIETARIO" ? "..." : "Aprobar"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleVerificarComprobante(transferencia.id, "PROPIETARIO", false)}
+                              disabled={verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "PROPIETARIO"}
+                              variant="outline"
+                              className="flex-1 border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Rechazar
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Mensaje para ADMIN: no puede verificar comprobante del propietario */}
+                        {!getVerificacionComprobante(transferencia, "PROPIETARIO") && userRole === UserRole.ADMIN && (
+                          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3 text-xs text-blue-800 dark:text-blue-200">
+                            ℹ️ Solo el Propietario puede verificar su comprobante
+                          </div>
+                        )}
+                      </div>
+                      
                       {getVerificacionComprobante(transferencia, "PROPIETARIO") && (
                         <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-                          Verificado por: {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.nombre} {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.apellido}
-                          <br />
-                          {new Date(getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoAt || '').toLocaleDateString("es-AR")}
+                          <div>Verificado por: {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.nombre} {getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoPor.apellido}</div>
+                          <div>{new Date(getVerificacionComprobante(transferencia, "PROPIETARIO")?.verificadoAt || '').toLocaleDateString("es-AR")}</div>
+                          {getVerificacionComprobante(transferencia, "PROPIETARIO")?.comentario && (
+                            <div className="mt-1 p-2 bg-slate-100 dark:bg-slate-700 rounded text-xs">
+                              <strong>Motivo:</strong> {getVerificacionComprobante(transferencia, "PROPIETARIO")?.comentario}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -300,23 +410,61 @@ export const TransferenciasPendientesList = ({ inmobiliariaId, userRole }: Trans
                           <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
                             Comprobante Inmobiliaria
                           </span>
+                          {/* Indicador de actualización reciente */}
+                          {transferencia.updatedAt && new Date(transferencia.updatedAt).getTime() > new Date(transferencia.createdAt).getTime() + 10000 && (
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
+                              Actualizado
+                            </span>
+                          )}
                         </div>
                         <StatusBadge status={getEstadoComprobante(transferencia, "INMOBILIARIA")} />
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/transferencias/${transferencia.id}/comprobante-inmobiliaria`, '_blank')}
-                        className="w-full"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Ver Comprobante
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/transferencias/${transferencia.id}/comprobante-inmobiliaria`, '_blank')}
+                          className="w-full"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver Comprobante
+                        </Button>
+                        
+                        {/* Botones de aprobación/rechazo - ADMIN y SUPER_ADMIN pueden verificar comprobante de inmobiliaria */}
+                        {!getVerificacionComprobante(transferencia, "INMOBILIARIA") && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleVerificarComprobante(transferencia.id, "INMOBILIARIA", true)}
+                              disabled={verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "INMOBILIARIA"}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              {verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "INMOBILIARIA" ? "..." : "Aprobar"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleVerificarComprobante(transferencia.id, "INMOBILIARIA", false)}
+                              disabled={verificandoComprobante?.transferenciaId === transferencia.id && verificandoComprobante?.tipo === "INMOBILIARIA"}
+                              variant="outline"
+                              className="flex-1 border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Rechazar
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
                       {getVerificacionComprobante(transferencia, "INMOBILIARIA") && (
                         <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-                          Verificado por: {getVerificacionComprobante(transferencia, "INMOBILIARIA")?.verificadoPor.nombre} {getVerificacionComprobante(transferencia, "INMOBILIARIA")?.verificadoPor.apellido}
-                          <br />
-                          {new Date(getVerificacionComprobante(transferencia, "INMOBILIARIA")?.verificadoAt || '').toLocaleDateString("es-AR")}
+                          <div>Verificado por: {getVerificacionComprobante(transferencia, "INMOBILIARIA")?.verificadoPor.nombre} {getVerificacionComprobante(transferencia, "INMOBILIARIA")?.verificadoPor.apellido}</div>
+                          <div>{new Date(getVerificacionComprobante(transferencia, "INMOBILIARIA")?.verificadoAt || '').toLocaleDateString("es-AR")}</div>
+                          {getVerificacionComprobante(transferencia, "INMOBILIARIA")?.comentario && (
+                            <div className="mt-1 p-2 bg-slate-100 dark:bg-slate-700 rounded text-xs">
+                              <strong>Motivo:</strong> {getVerificacionComprobante(transferencia, "INMOBILIARIA")?.comentario}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -552,6 +700,54 @@ export const TransferenciasPendientesList = ({ inmobiliariaId, userRole }: Trans
           </Card>
         ))}
       </div>
+
+      {/* Modal de rechazo de comprobante */}
+      <Dialog open={rechazandoComprobante !== null} onOpenChange={(open) => !open && setRechazandoComprobante(null)}>
+        <DialogContent onClose={() => setRechazandoComprobante(null)}>
+          <DialogHeader>
+            <DialogTitle>Rechazar Comprobante</DialogTitle>
+            <DialogDescription>
+              Debes proporcionar un motivo para rechazar el comprobante de {rechazandoComprobante?.tipo === "PROPIETARIO" ? "Propietario" : "Inmobiliaria"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogBody>
+            <div className="space-y-2">
+              <Label htmlFor="comentario-rechazo">Motivo del rechazo</Label>
+              <Textarea
+                id="comentario-rechazo"
+                value={comentarioRechazo}
+                onChange={(e) => setComentarioRechazo(e.target.value)}
+                placeholder="Ej: El comprobante no coincide con el monto solicitado"
+                rows={4}
+                className="resize-none"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                El inquilino podrá ver este motivo y deberá subir un nuevo comprobante.
+              </p>
+            </div>
+          </DialogBody>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRechazandoComprobante(null);
+                setComentarioRechazo("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRechazarComprobante}
+              disabled={!comentarioRechazo.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Rechazar Comprobante
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

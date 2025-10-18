@@ -238,11 +238,39 @@ export const registerTransferencia = async (
     throw new HttpError(400, "Debes subir al menos un comprobante");
   }
 
+  // Verificar si ya existe una transferencia
+  const existingTransferencia = await prisma.transferencia.findUnique({
+    where: { pagoId },
+    include: { verificaciones: true },
+  });
+
+  // Si se está resubiendo un comprobante, eliminar la verificación anterior de ese tipo
+  if (existingTransferencia) {
+    const tiposAEliminar: string[] = [];
+    
+    if (comprobantePropietarioPath) {
+      tiposAEliminar.push("PROPIETARIO");
+    }
+    if (comprobanteInmobiliariaPath) {
+      tiposAEliminar.push("INMOBILIARIA");
+    }
+
+    // Eliminar verificaciones anteriores de los comprobantes que se están resubiendo
+    if (tiposAEliminar.length > 0) {
+      await prisma.verificacionComprobante.deleteMany({
+        where: {
+          transferenciaId: existingTransferencia.id,
+          tipoComprobante: { in: tiposAEliminar as any },
+        },
+      });
+    }
+  }
+
   const transferencia = await prisma.transferencia.upsert({
     where: { pagoId },
     update: {
-      comprobantePropietarioPath,
-      comprobanteInmobiliariaPath,
+      comprobantePropietarioPath: comprobantePropietarioPath || existingTransferencia?.comprobantePropietarioPath,
+      comprobanteInmobiliariaPath: comprobanteInmobiliariaPath || existingTransferencia?.comprobanteInmobiliariaPath,
       verificado: TransferenciaEstado.PENDIENTE_VERIFICACION,
       comentario: parsed.comentario,
     },

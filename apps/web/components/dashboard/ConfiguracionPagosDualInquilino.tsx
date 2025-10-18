@@ -14,6 +14,13 @@ interface ConfiguracionPagosDualInquilinoProps {
   comprobanteInmobiliaria: File | null;
   onSubmitComprobante: (tipo: 'propietario' | 'inmobiliaria') => Promise<void>;
   isSubmitting: boolean;
+  verificaciones?: {
+    tipoComprobante: string;
+    verificado: boolean;
+    comentario?: string;
+  }[];
+  comprobantePropietarioEnviado?: boolean;
+  comprobanteInmobiliariaEnviado?: boolean;
 }
 
 interface ConfiguracionPagosPublica {
@@ -34,11 +41,35 @@ export const ConfiguracionPagosDualInquilino = ({
   comprobantePropietario,
   comprobanteInmobiliaria,
   onSubmitComprobante,
-  isSubmitting
+  isSubmitting,
+  verificaciones,
+  comprobantePropietarioEnviado = false,
+  comprobanteInmobiliariaEnviado = false
 }: ConfiguracionPagosDualInquilinoProps) => {
   const [configuracion, setConfiguracion] = useState<ConfiguracionPagosDualResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
+
+  const getVerificacion = (tipo: string) => {
+    return verificaciones?.find(v => v.tipoComprobante === tipo);
+  };
+
+  const isRechazado = (tipo: string) => {
+    const verif = getVerificacion(tipo);
+    return verif && verif.verificado === false;
+  };
+
+  const isAprobado = (tipo: string) => {
+    const verif = getVerificacion(tipo);
+    return verif && verif.verificado === true;
+  };
+
+  const isPendiente = (tipo: string) => {
+    const verif = getVerificacion(tipo);
+    const enviado = tipo === 'PROPIETARIO' ? comprobantePropietarioEnviado : comprobanteInmobiliariaEnviado;
+    // Está pendiente si el comprobante fue enviado Y no hay verificación (ni aprobado ni rechazado)
+    return enviado && !verif;
+  };
 
   useEffect(() => {
     loadConfiguracion();
@@ -248,52 +279,117 @@ export const ConfiguracionPagosDualInquilino = ({
 
               {/* Subida de Comprobante */}
               <div className={`rounded-xl border-2 border-dashed p-6 transition-all duration-300 ${
-                propietarioCompleto 
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600' 
-                  : 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:border-blue-400'
+                isRechazado('PROPIETARIO')
+                  ? 'bg-red-50 dark:bg-red-900/20 border-red-400 dark:border-red-600'
+                  : isAprobado('PROPIETARIO')
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600'
+                    : propietarioCompleto 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600' 
+                      : 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:border-blue-400'
               }`}>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    {propietarioCompleto ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-600" />
-                    ) : (
-                      <Upload className="w-6 h-6 text-blue-600" />
-                    )}
-                    <div>
-                      <h4 className={`font-semibold ${propietarioCompleto ? 'text-green-800 dark:text-green-200' : 'text-blue-800 dark:text-blue-200'}`}>
-                        {propietarioCompleto ? '✓ Comprobante cargado' : 'Sube el comprobante del propietario'}
-                      </h4>
-                      <p className={`text-sm ${propietarioCompleto ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'}`}>
-                        {propietarioCompleto ? comprobantePropietario?.name : 'Foto o PDF del comprobante de transferencia'}
-                      </p>
+                  {/* Estado de rechazo */}
+                  {isRechazado('PROPIETARIO') && (
+                    <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h5 className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                            Comprobante Rechazado
+                          </h5>
+                          <p className="text-sm text-red-800 dark:text-red-200">
+                            <strong>Motivo:</strong> {getVerificacion('PROPIETARIO')?.comentario || 'No especificado'}
+                          </p>
+                          <p className="text-xs text-red-700 dark:text-red-300 mt-2">
+                            Por favor, sube un nuevo comprobante que cumpla con los requisitos.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Estado pendiente */}
+                  {isPendiente('PROPIETARIO') && !isRechazado('PROPIETARIO') && !isAprobado('PROPIETARIO') && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="animate-pulse">
+                          <div className="w-5 h-5 rounded-full bg-yellow-500"></div>
+                        </div>
+                        <div>
+                          <h5 className="font-semibold text-yellow-900 dark:text-yellow-100">
+                            Pendiente de Verificación
+                          </h5>
+                          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                            Tu comprobante está siendo revisado. Te notificaremos cuando sea verificado.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Estado aprobado */}
+                  {isAprobado('PROPIETARIO') && !isRechazado('PROPIETARIO') && (
+                    <div className="bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <div>
+                          <h5 className="font-semibold text-green-900 dark:text-green-100">
+                            Comprobante Aprobado
+                          </h5>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            Tu comprobante ha sido verificado correctamente.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isPendiente('PROPIETARIO') && !isAprobado('PROPIETARIO') && (
+                    <div className="flex items-center gap-3">
+                      {propietarioCompleto ? (
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                      ) : (
+                        <Upload className="w-6 h-6 text-blue-600" />
+                      )}
+                      <div>
+                        <h4 className={`font-semibold ${propietarioCompleto ? 'text-green-800 dark:text-green-200' : 'text-blue-800 dark:text-blue-200'}`}>
+                          {propietarioCompleto ? '✓ Comprobante cargado' : 'Sube el comprobante del propietario'}
+                        </h4>
+                        <p className={`text-sm ${propietarioCompleto ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'}`}>
+                          {propietarioCompleto ? comprobantePropietario?.name : 'Foto o PDF del comprobante de transferencia'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
-                  <label className="block">
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => handleFileChange('propietario', e)}
-                      className="block w-full text-sm text-slate-600 dark:text-slate-400
-                        file:mr-4 file:py-3 file:px-6
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-blue-600 file:text-white
-                        hover:file:bg-blue-700
-                        file:cursor-pointer file:transition-all
-                        cursor-pointer"
-                    />
-                  </label>
+                  {/* Solo mostrar input si no está aprobado ni pendiente */}
+                  {!isAprobado('PROPIETARIO') && !isPendiente('PROPIETARIO') && (
+                    <label className="block">
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFileChange('propietario', e)}
+                        className="block w-full text-sm text-slate-600 dark:text-slate-400
+                          file:mr-4 file:py-3 file:px-6
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-600 file:text-white
+                          hover:file:bg-blue-700
+                          file:cursor-pointer file:transition-all
+                          cursor-pointer"
+                      />
+                    </label>
+                  )}
 
                   {/* Botón de envío */}
-                  {propietarioCompleto && (
+                  {propietarioCompleto && !isAprobado('PROPIETARIO') && !isPendiente('PROPIETARIO') && (
                     <Button
                       type="button"
                       onClick={() => onSubmitComprobante('propietario')}
                       disabled={isSubmitting}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      {isSubmitting ? 'Enviando...' : 'Enviar Comprobante del Propietario'}
+                      {isSubmitting ? 'Enviando...' : isRechazado('PROPIETARIO') ? 'Reenviar Comprobante del Propietario' : 'Enviar Comprobante del Propietario'}
                     </Button>
                   )}
                 </div>
@@ -420,52 +516,117 @@ export const ConfiguracionPagosDualInquilino = ({
 
               {/* Subida de Comprobante */}
               <div className={`rounded-xl border-2 border-dashed p-6 transition-all duration-300 ${
-                inmobiliariaCompleto 
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600' 
-                  : 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 hover:border-purple-400'
+                isRechazado('INMOBILIARIA')
+                  ? 'bg-red-50 dark:bg-red-900/20 border-red-400 dark:border-red-600'
+                  : isAprobado('INMOBILIARIA')
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600'
+                    : inmobiliariaCompleto 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600' 
+                      : 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 hover:border-purple-400'
               }`}>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    {inmobiliariaCompleto ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-600" />
-                    ) : (
-                      <Upload className="w-6 h-6 text-purple-600" />
-                    )}
-                    <div>
-                      <h4 className={`font-semibold ${inmobiliariaCompleto ? 'text-green-800 dark:text-green-200' : 'text-purple-800 dark:text-purple-200'}`}>
-                        {inmobiliariaCompleto ? '✓ Comprobante cargado' : 'Sube el comprobante de la inmobiliaria'}
-                      </h4>
-                      <p className={`text-sm ${inmobiliariaCompleto ? 'text-green-700 dark:text-green-300' : 'text-purple-700 dark:text-purple-300'}`}>
-                        {inmobiliariaCompleto ? comprobanteInmobiliaria?.name : 'Foto o PDF del comprobante de transferencia'}
-                      </p>
+                  {/* Estado de rechazo */}
+                  {isRechazado('INMOBILIARIA') && (
+                    <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h5 className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                            Comprobante Rechazado
+                          </h5>
+                          <p className="text-sm text-red-800 dark:text-red-200">
+                            <strong>Motivo:</strong> {getVerificacion('INMOBILIARIA')?.comentario || 'No especificado'}
+                          </p>
+                          <p className="text-xs text-red-700 dark:text-red-300 mt-2">
+                            Por favor, sube un nuevo comprobante que cumpla con los requisitos.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Estado pendiente */}
+                  {isPendiente('INMOBILIARIA') && !isRechazado('INMOBILIARIA') && !isAprobado('INMOBILIARIA') && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="animate-pulse">
+                          <div className="w-5 h-5 rounded-full bg-yellow-500"></div>
+                        </div>
+                        <div>
+                          <h5 className="font-semibold text-yellow-900 dark:text-yellow-100">
+                            Pendiente de Verificación
+                          </h5>
+                          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                            Tu comprobante está siendo revisado. Te notificaremos cuando sea verificado.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Estado aprobado */}
+                  {isAprobado('INMOBILIARIA') && !isRechazado('INMOBILIARIA') && (
+                    <div className="bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <div>
+                          <h5 className="font-semibold text-green-900 dark:text-green-100">
+                            Comprobante Aprobado
+                          </h5>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            Tu comprobante ha sido verificado correctamente.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isPendiente('INMOBILIARIA') && !isAprobado('INMOBILIARIA') && (
+                    <div className="flex items-center gap-3">
+                      {inmobiliariaCompleto ? (
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                      ) : (
+                        <Upload className="w-6 h-6 text-purple-600" />
+                      )}
+                      <div>
+                        <h4 className={`font-semibold ${inmobiliariaCompleto ? 'text-green-800 dark:text-green-200' : 'text-purple-800 dark:text-purple-200'}`}>
+                          {inmobiliariaCompleto ? '✓ Comprobante cargado' : 'Sube el comprobante de la inmobiliaria'}
+                        </h4>
+                        <p className={`text-sm ${inmobiliariaCompleto ? 'text-green-700 dark:text-green-300' : 'text-purple-700 dark:text-purple-300'}`}>
+                          {inmobiliariaCompleto ? comprobanteInmobiliaria?.name : 'Foto o PDF del comprobante de transferencia'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
-                  <label className="block">
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => handleFileChange('inmobiliaria', e)}
-                      className="block w-full text-sm text-slate-600 dark:text-slate-400
-                        file:mr-4 file:py-3 file:px-6
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-purple-600 file:text-white
-                        hover:file:bg-purple-700
-                        file:cursor-pointer file:transition-all
-                        cursor-pointer"
-                    />
-                  </label>
+                  {/* Solo mostrar input si no está aprobado ni pendiente */}
+                  {!isAprobado('INMOBILIARIA') && !isPendiente('INMOBILIARIA') && (
+                    <label className="block">
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFileChange('inmobiliaria', e)}
+                        className="block w-full text-sm text-slate-600 dark:text-slate-400
+                          file:mr-4 file:py-3 file:px-6
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-purple-600 file:text-white
+                          hover:file:bg-purple-700
+                          file:cursor-pointer file:transition-all
+                          cursor-pointer"
+                      />
+                    </label>
+                  )}
 
                   {/* Botón de envío */}
-                  {inmobiliariaCompleto && (
+                  {inmobiliariaCompleto && !isAprobado('INMOBILIARIA') && !isPendiente('INMOBILIARIA') && (
                     <Button
                       type="button"
                       onClick={() => onSubmitComprobante('inmobiliaria')}
                       disabled={isSubmitting}
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                     >
-                      {isSubmitting ? 'Enviando...' : 'Enviar Comprobante de la Inmobiliaria'}
+                      {isSubmitting ? 'Enviando...' : isRechazado('INMOBILIARIA') ? 'Reenviar Comprobante de la Inmobiliaria' : 'Enviar Comprobante de la Inmobiliaria'}
                     </Button>
                   )}
                 </div>

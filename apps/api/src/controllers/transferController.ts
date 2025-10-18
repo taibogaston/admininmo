@@ -1,7 +1,7 @@
 ﻿import { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
-import { listTransferenciasPendientes, verificarTransferencia, getTransferenciaFile, getTransferenciaFilePropietario, getTransferenciaFileInmobiliaria } from "../services/transferService";
+import { listTransferenciasPendientes, verificarTransferencia, getTransferenciaFile, getTransferenciaFilePropietario, getTransferenciaFileInmobiliaria, verificarComprobanteIndividual } from "../services/transferService";
 import { HttpError } from "../utils/errors";
 import { AuthTokenPayload } from "@admin-inmo/shared";
 
@@ -147,4 +147,16 @@ export const transferenciaComprobanteInmobiliariaController = async (req: Authen
   
   res.setHeader('Content-Type', contentType);
   res.sendFile(path.resolve(transferencia.comprobanteInmobiliariaPath));
+};
+
+export const verificarComprobanteController = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) throw new HttpError(401, "No autenticado");
+  
+  const { id, tipo } = req.params;
+  if (tipo !== "PROPIETARIO" && tipo !== "INMOBILIARIA") {
+    throw new HttpError(400, "Tipo de comprobante inválido");
+  }
+  
+  const result = await verificarComprobanteIndividual(id, tipo, req.user, req.body);
+  res.json(result);
 };
